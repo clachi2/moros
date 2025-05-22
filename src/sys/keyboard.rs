@@ -3,8 +3,7 @@ use crate::sys;
 
 use core::sync::atomic::{AtomicBool, Ordering};
 use pc_keyboard::{
-    layouts, DecodedKey, Error, HandleControl, KeyCode, KeyEvent, KeyState,
-    Keyboard, ScancodeSet1,
+    layouts, DecodedKey, Error, HandleControl, KeyCode, KeyEvent, KeyState, Keyboard, ScancodeSet1,
 };
 use spin::Mutex;
 use x86_64::instructions::port::Port;
@@ -19,6 +18,7 @@ pub enum KeyboardLayout {
     Azerty(Keyboard<layouts::Azerty, ScancodeSet1>),
     Dvorak(Keyboard<layouts::Dvorak104Key, ScancodeSet1>),
     Qwerty(Keyboard<layouts::Us104Key, ScancodeSet1>),
+    Qwertz(Keyboard<layouts::De105Key, ScancodeSet1>),
 }
 
 impl KeyboardLayout {
@@ -27,6 +27,7 @@ impl KeyboardLayout {
             KeyboardLayout::Azerty(kb) => kb.add_byte(scancode),
             KeyboardLayout::Dvorak(kb) => kb.add_byte(scancode),
             KeyboardLayout::Qwerty(kb) => kb.add_byte(scancode),
+            KeyboardLayout::Qwertz(kb) => kb.add_byte(scancode),
         }
     }
 
@@ -35,6 +36,7 @@ impl KeyboardLayout {
             KeyboardLayout::Azerty(kb) => kb.process_keyevent(event),
             KeyboardLayout::Dvorak(kb) => kb.process_keyevent(event),
             KeyboardLayout::Qwerty(kb) => kb.process_keyevent(event),
+            KeyboardLayout::Qwertz(kb) => kb.process_keyevent(event),
         }
     }
 
@@ -53,6 +55,11 @@ impl KeyboardLayout {
             "qwerty" => Some(KeyboardLayout::Qwerty(Keyboard::new(
                 ScancodeSet1::new(),
                 layouts::Us104Key,
+                HandleControl::MapLettersToUnicode,
+            ))),
+            "qwertz" => Some(KeyboardLayout::Qwertz(Keyboard::new(
+                ScancodeSet1::new(),
+                layouts::De105Key,
                 HandleControl::MapLettersToUnicode,
             ))),
             _ => None,

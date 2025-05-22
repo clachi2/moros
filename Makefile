@@ -15,7 +15,7 @@ mode = release
 # Emulation options
 smp = 2
 nic = rtl8139# rtl8139, pcnet, e1000
-audio = sdl# sdl, coreaudio
+audio = coreaudio# sdl, coreaudio
 signal = off# on
 kvm = false
 pcap = false
