@@ -40,3 +40,4 @@ pub mod time;
 pub mod user;
 pub mod view;
 pub mod write;
+mod game;

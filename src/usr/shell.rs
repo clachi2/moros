@@ -565,6 +565,7 @@ fn dispatch(args: &[&str], config: &mut Config) -> Result<(), ExitCode> {
         "view"     => usr::view::main(args),
         "write"    => usr::write::main(args),
         "panic"    => panic!("{}", args[1..].join(" ")),
+        "game"     => usr::game::main(args),
         _ => {
             let mut path = fs::realpath(args[0]);
             if path.len() > 1 {
