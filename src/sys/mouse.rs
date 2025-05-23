@@ -37,6 +37,18 @@ pub struct MouseEvent {
     pub buttons: u8,
 }
 
+impl MouseEvent {
+    pub fn is_left_click(&self) -> bool {
+        self.buttons & 0x01 != 0
+    }
+    pub fn is_right_click(&self) -> bool {
+        self.buttons & 0x02 != 0
+    }
+    pub fn is_middle_click(&self) -> bool {
+        self.buttons & 0x04 != 0
+    }
+}
+
 pub struct MouseQueue {
     receiver: Receiver<MouseEvent>,
     sender: Sender<MouseEvent>,

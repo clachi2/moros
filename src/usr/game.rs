@@ -1,4 +1,4 @@
-use crate::api::fs::{write};
+use crate::api::fs::write;
 use crate::api::process::ExitCode;
 use crate::sys::console;
 use crate::sys::mouse::MOUSE_BUFFER;
@@ -48,6 +48,27 @@ impl Rectangle {
             self.y += 5;
         }
     }
+
+    fn set_color(&mut self, color: u8) {
+        self.color = color;
+    }
+
+    fn add_pos(&mut self, x: i8, y: i8) {
+        if (self.x as i32 + x as i32) < 0 {
+            self.x = 0;
+        } else if (self.x as i32 + x as i32)  > WIDTH as i32 {
+            self.x = WIDTH - 1;
+        } else {
+            self.x += x as usize;
+        }
+        if (self.y as i32 + y as i32) < 0 {
+            self.y = 0;
+        } else if (self.y as i32 + y as i32) > HEIGHT as i32 {
+            self.y = HEIGHT - 1;
+        } else {
+            self.y += y as usize;
+        }
+    }
 }
 
 struct Framebuffer {
@@ -85,7 +106,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     print!("\x1b[?25l"); // Cursor ausblenden
 
     let mut fb = Framebuffer::new();
-    let mut rect = Rectangle::new(WIDTH / 2 - 20, HEIGHT / 2 - 20, 40, 40, 0x3);
+    let mut rect = Rectangle::new(WIDTH / 2 - 20, HEIGHT / 2 - 20, 10, 10, 0x3);
 
     MOUSE_BUFFER.get().unwrap().clear_events();
     // Hauptspielschleife
@@ -101,18 +122,14 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         while let Some(event) = MOUSE_BUFFER.get().unwrap().get_last_event() {
             x_pos += event.x_movement;
             y_pos += event.y_movement;
+            if event.is_left_click() {
+                rect.set_color(0x4);
+            } else {
+                rect.set_color(0x3);
+            }
         }
 
-        if x_pos > 0 {
-            rect.move_right();
-        } else if x_pos < 0 {
-            rect.move_left();
-        }
-        if y_pos > 0 {
-            rect.move_down();
-        } else if y_pos < 0 {
-            rect.move_up();
-        }
+        rect.add_pos(x_pos, y_pos);
 
         // Tastatureingaben verarbeiten - non-blocking
         console::disable_echo();
