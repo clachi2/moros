@@ -27,6 +27,7 @@ pub fn init(boot_info: &'static BootInfo) {
     // the keyboard interrupt that would create a panic if a key is pressed
     // during memory allocation otherwise.
     sys::idt::set_irq_mask(1);
+    sys::idt::set_irq_mask(12);
 
     let mut memory_size = 0;
     let mut last_end_addr = 0;
@@ -73,6 +74,7 @@ pub fn init(boot_info: &'static BootInfo) {
     heap::init_heap().expect("heap initialization failed");
 
     sys::idt::clear_irq_mask(1);
+    sys::idt::clear_irq_mask(12);
 }
 
 pub fn phys_mem_offset() -> u64 {

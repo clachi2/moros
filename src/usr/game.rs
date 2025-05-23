@@ -1,6 +1,7 @@
+use crate::api::fs::{write};
 use crate::api::process::ExitCode;
-use crate::api::fs::{write, read};
 use crate::sys::console;
+use crate::sys::mouse::MOUSE_BUFFER;
 
 //G640x480x16
 const WIDTH: usize = 320;
@@ -15,7 +16,13 @@ struct Rectangle {
 
 impl Rectangle {
     fn new(x: usize, y: usize, width: usize, height: usize, color: u8) -> Self {
-        Self { x, y, width, height, color }
+        Self {
+            x,
+            y,
+            width,
+            height,
+            color,
+        }
     }
 
     fn move_left(&mut self) {
@@ -73,21 +80,38 @@ impl Framebuffer {
     }
 }
 
-
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     write("/dev/vga/mode", b"320x200").expect("Could not switch to graphics mode");
     print!("\x1b[?25l"); // Cursor ausblenden
 
-
     let mut fb = Framebuffer::new();
-    let mut rect = Rectangle::new(WIDTH/2 - 20, HEIGHT/2 - 20, 40, 40, 0x3);
+    let mut rect = Rectangle::new(WIDTH / 2 - 20, HEIGHT / 2 - 20, 40, 40, 0x3);
 
+    MOUSE_BUFFER.get().unwrap().clear_events();
     // Hauptspielschleife
     loop {
-
         // Exit-Bedingungen prüfen
         if console::end_of_text() || console::end_of_transmission() {
             break;
+        }
+
+        let mut x_pos = 0;
+        let mut y_pos = 0;
+
+        while let Some(event) = MOUSE_BUFFER.get().unwrap().get_last_event() {
+            x_pos += event.x_movement;
+            y_pos += event.y_movement;
+        }
+
+        if x_pos > 0 {
+            rect.move_right();
+        } else if x_pos < 0 {
+            rect.move_left();
+        }
+        if y_pos > 0 {
+            rect.move_down();
+        } else if y_pos < 0 {
+            rect.move_up();
         }
 
         // Tastatureingaben verarbeiten - non-blocking
