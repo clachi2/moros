@@ -2,6 +2,7 @@ use crate::api::fs::write;
 use crate::api::process::ExitCode;
 use crate::sys::console;
 use crate::sys::mouse::MOUSE_BUFFER;
+use crate::sys::vga::framebuffer;
 
 //G640x480x16
 const WIDTH: usize = 320;
@@ -105,7 +106,8 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     write("/dev/vga/mode", b"320x200").expect("Could not switch to graphics mode");
     print!("\x1b[?25l"); // Cursor ausblenden
 
-    let mut fb = Framebuffer::new();
+    // let mut fb = Framebuffer::new();
+    let mut fb = framebuffer::Framebuffer::new(320, 200, 8, "/dev/vga/buffer");
     let mut rect = Rectangle::new(WIDTH / 2 - 20, HEIGHT / 2 - 20, 10, 10, 0x3);
 
     MOUSE_BUFFER.get().unwrap().clear_events();
@@ -151,10 +153,18 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         console::disable_raw();
 
         // Rendern
-        fb.clear();
-        fb.draw_rectangle(&rect);
+        // fb.clear();
+        // fb.draw_rectangle(&rect);
+        //
+        // write("/dev/vga/buffer", &fb.buffer).expect("Could not write to buffer");
 
-        write("/dev/vga/buffer", &fb.buffer).expect("Could not write to buffer");
+        fb.clear();
+        fb.draw_rectangle(rect.x, rect.y, rect.width, rect.height, rect.color);
+        fb.draw_line(10,10, 100, 200, 0x1);
+        fb.draw_line(100, 10, 10, 200, 0x2);
+        fb.draw_circle(150, 100, 50, 0x5, true);
+        fb.draw_circle(200, 100, 50, 0x6, false);
+        fb.flush();
 
         // Frame-Rate Kontrolle
         for _ in 0..1000 {

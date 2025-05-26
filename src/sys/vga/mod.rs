@@ -4,6 +4,7 @@ mod buffer;
 mod palette;
 mod screen;
 mod writer;
+pub mod framebuffer;
 
 pub use font::VgaFont;
 pub use screen::VgaMode;
