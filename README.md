@@ -1,5 +1,23 @@
 # MOROS: Obscure Rust Operating System
 
+create img:
+```bash
+make image output=video keyboard=qwertz
+```
+copy image to disk2
+```bash
+qemu-img create disk2.img 32M
+dd conv=notrunc if=target/x86_64-moros/release/bootimage-moros.bin of=disk2.img
+```
+boot server
+```bash
+qemu-system-x86_64 -m 32 -smp 2 -drive file=disk.img,format=raw -audiodev coreaudio,id=a0 -machine pcspk-audiodev=a0 -netdev socket,id=net0,listen=:12345 -device rtl8139,netdev=net0 -cpu core2duo
+```
+boot client
+```bash
+qemu-system-x86_64 -m 32 -smp 2 -drive file=disk2.img,format=raw -audiodev coreaudio,id=a0 -machine pcspk-audiodev=a0 -netdev socket,id=net0,connect=127.0.0.1:12345 -device rtl8139,netdev=net0 -cpu core2duo
+```
+
 ![screenshot](doc/images/moros.png)
 
 MOROS is a hobby operating system written in Rust by [Vincent Ollivier][0].

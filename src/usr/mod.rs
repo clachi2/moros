@@ -40,4 +40,6 @@ pub mod time;
 pub mod user;
 pub mod view;
 pub mod write;
-mod game;
+pub mod game;
+pub mod client;
+mod server;
