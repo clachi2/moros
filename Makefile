@@ -76,7 +76,8 @@ image: $(img)
 
 qemu-opts = -m $(memory) -smp $(smp) -drive file=$(img),format=raw \
 			 -audiodev $(audio),id=a0 -machine pcspk-audiodev=a0 \
-			 -netdev user,id=e0,hostfwd=tcp::8080-:80 -device $(nic),netdev=e0
+			 -netdev user,id=e0,hostfwd=tcp::8080-:80 -device $(nic),netdev=e0, \
+			 -serial stdio
 ifeq ($(kvm),true)
 	qemu-opts += -cpu host -accel kvm
 else

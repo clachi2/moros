@@ -58,3 +58,5 @@ pub mod speaker;
 pub mod syscall;
 pub mod vga;
 pub mod mouse;
+#[macro_use]
+pub mod devices;

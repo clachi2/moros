@@ -5,9 +5,7 @@ extern crate alloc;
 
 use bootloader::{entry_point, BootInfo};
 use core::panic::PanicInfo;
-use moros::{
-    debug, error, warning, hlt_loop, eprint, eprintln, print, println, sys, usr
-};
+use moros::{debug, error, warning, hlt_loop, eprint, eprintln, print, println, sys, usr, kprint};
 
 entry_point!(main);
 
@@ -21,6 +19,7 @@ fn main(boot_info: &'static BootInfo) -> ! {
             usr::shell::exec(cmd).ok();
             sys::acpi::shutdown();
         } else {
+            kprint!("HELLOOOO");
             user_boot();
         }
     }
