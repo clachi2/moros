@@ -1,3 +1,4 @@
+use crate::api::font::Font;
 use crate::api::fs::write;
 use crate::api::process::ExitCode;
 use crate::sys::console;
@@ -110,6 +111,9 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     let mut fb = framebuffer::Framebuffer::new(320, 200, 8, "/dev/vga/buffer");
     let mut rect = Rectangle::new(WIDTH / 2 - 20, HEIGHT / 2 - 20, 10, 10, 0x3);
 
+    let buf = include_bytes!("../../dsk/ini/fonts/cp857-8x8.psf");
+    let font = Font::try_from(&buf[..]).unwrap();
+
     MOUSE_BUFFER.get().unwrap().clear_events();
     // Hauptspielschleife
     loop {
@@ -164,6 +168,8 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         fb.draw_line(100, 10, 10, 200, 0x2);
         fb.draw_circle(150, 100, 50, 0x5, true);
         fb.draw_circle(200, 100, 50, 0x6, false);
+
+        fb.draw_text(10, 10, "Hallo Welt!", 0x7, &font, 1.0);
         fb.flush();
 
         // Frame-Rate Kontrolle

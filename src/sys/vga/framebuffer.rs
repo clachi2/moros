@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use alloc::vec;
+use crate::api::font::Font;
 use crate::api::fs::write;
 
 pub struct Framebuffer {
@@ -112,6 +113,40 @@ impl Framebuffer {
                 x -= 1;
                 err -= 2 * x + 1;
             }
+        }
+    }
+
+    pub fn draw_text(
+        &mut self,
+        x: usize,
+        y: usize,
+        text: &str,
+        color: u8,
+        font: &Font,
+        scale: f32, // z. B. 0.5 für halb, 1.0 für normal
+    ) {
+        let mut cursor_x = x as f32;
+
+        for c in text.chars() {
+            let char_index = c as usize;
+            if char_index >= font.size as usize {
+                continue;
+            }
+
+            let offset = char_index * font.height as usize;
+            for dy in 0..font.height as usize {
+                let row = font.data[offset + dy];
+                for dx in 0..8 {
+                    if (row >> (7 - dx)) & 1 == 1 {
+                        let pixel_x = (cursor_x + dx as f32 * scale) as usize;
+                        let pixel_y = (y as f32 + dy as f32 * scale) as usize;
+
+                        self.draw_pixel(pixel_x, pixel_y, color);
+                    }
+                }
+            }
+
+            cursor_x += 8.0 * scale;
         }
     }
 }
