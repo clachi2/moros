@@ -104,6 +104,13 @@ impl Framebuffer {
 }
 
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
+
+    /*
+
+    asdf
+     */
+
+
     write("/dev/vga/mode", b"320x200").expect("Could not switch to graphics mode");
     print!("\x1b[?25l"); // Cursor ausblenden
 

@@ -1,16 +1,30 @@
+use crate::api::fs;
+use crate::api::fs::{FileIO, IO};
+use crate::api::process::ExitCode;
+use crate::sys::net::SocketStatus;
+use crate::sys::net::socket::tcp::TcpSocket;
+use crate::sys::syscall::service::exit;
+use alloc::format;
 use alloc::string::ToString;
+use bit_field::BitField;
 use core::net::Ipv4Addr;
 use smoltcp::wire::{IpAddress, IpCidr};
-use crate::api::fs;
-use crate::api::fs::FileIO;
-use crate::api::process::ExitCode;
-use crate::sys::net::socket::tcp::TcpSocket;
 
 extern crate alloc;
 
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
+    let mut last_digit = 2;
+    if args.len() > 1 {
+        last_digit = match args[1].parse::<u8>() {
+            Ok(digit) if digit >= 2 && digit <= 255 => digit,
+            _ => {
+                println!("Ungültige Eingabe. Bitte eine Zahl zwischen 2 und 255 eingeben.");
+                return Err(ExitCode::Failure);
+            }
+        };
+    }
 
-    let addr = IpAddress::from(Ipv4Addr::new(192, 168, 0, 2));
+    let addr = IpAddress::from(Ipv4Addr::new(192, 168, 0, last_digit));
     let server_ip = IpAddress::from(Ipv4Addr::new(192, 168, 0, 1));
 
     if fs::write("/dev/net/ip", IpCidr::new(addr, 24).to_string().as_bytes()).is_err() {
@@ -26,13 +40,42 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
 
     let mut client = TcpSocket::new();
 
-
     if let Err(e) = client.connect(server_ip, server_port) {
         println!("Failed to connect to server: {:?}", e);
         return Err(ExitCode::Failure);
     }
 
     println!("Connected to server.");
+
+    let mut count = 0;
+
+    loop {
+        // Sende eine Nachricht an den Server
+        let mut status_buf = [0];
+        client.read(&mut status_buf).ok();
+
+        if client.poll(IO::Write) {
+            let message = format!("Hello from client {}! count: {}", last_digit, count);
+            if client.write(message.as_bytes()).is_err() {
+                println!("Failed to send message to server");
+                // break;
+            }
+            count += 1;
+        }
+
+        // Empfange eine Antwort vom Server
+        while client.poll(IO::Read) {
+            let mut buf = [0u8; 512];
+            if let Ok(size) = client.read(&mut buf) {
+                let msg = &buf[..size];
+                println!(
+                    "Server sent: {:?}",
+                    core::str::from_utf8(msg).unwrap_or("???")
+                );
+            }
+        }
+    }
+    return Ok(());
 
     // Nachricht empfangen
     let mut buf = [0u8; 128]; // Buffer eventuell etwas größer machen, falls die Server-Nachricht länger ist
@@ -51,7 +94,6 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         }
         Err(e) => {
             println!("Failed to read from server: {:?}", e);
-
         }
     }
 

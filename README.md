@@ -1,3 +1,26 @@
+# TANK-GAME
+
+![img.png](tank-game.png)
+
+* Zeitablauf:
+    * Server startet 
+      * Erstellt zufällige Karte
+      * wartet auf Client-Verbindung
+    * Client startet
+      * Verbindet sich mit Server
+      * lädt Karte vom Server
+    * Loop:
+      * Client -> Server:
+        * Schickt Bewegung, ausrichtung, Schuss
+      * Server -> Client:
+        * Schickt Spieler, Schüsse(Kreise), Punkte
+        * Schickt ob tot, usw. (kompletten Zustand)
+    * Client:
+      * lokal Bewegungen ausführen, eventuell interpoliert mit den letzen Server-Daten
+      * zeichnet Spieler, Schüsse, Punkte, usw.
+      * zeichnet Karte
+        * 
+
 # MOROS: Obscure Rust Operating System
 
 create img:
