@@ -48,6 +48,7 @@ impl Framebuffer {
     pub fn draw_pixel(&mut self, x: usize, y: usize, color: u8) {
         if x < self.width && y < self.height {
             let index = y * self.pitch + x * (self.color_depth / 8);
+            //let index = y * self.width + x;
             self.internal_buffer[index] = color;
         }
     }
