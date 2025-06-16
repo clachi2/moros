@@ -2,7 +2,7 @@ use crate::api::font::Font;
 use crate::api::fs::write;
 use crate::api::process::ExitCode;
 use crate::sys::console;
-use crate::sys::mouse::MOUSE_BUFFER;
+use crate::sys::mouse::{get_event_buffer};
 use crate::sys::vga::framebuffer;
 
 //G640x480x16
@@ -105,23 +105,29 @@ impl Framebuffer {
 
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
 
-    /*
-
-    asdf
-     */
+    kprintln!("Starting game...");
 
 
     write("/dev/vga/mode", b"320x200").expect("Could not switch to graphics mode");
     print!("\x1b[?25l"); // Cursor ausblenden
 
+    kprintln!("Framebuffer resolution set to 320x200");
+
     // let mut fb = Framebuffer::new();
     let mut fb = framebuffer::Framebuffer::new(320, 200, 8, "/dev/vga/buffer");
     let mut rect = Rectangle::new(WIDTH / 2 - 20, HEIGHT / 2 - 20, 10, 10, 0x3);
 
+    kprintln!("Rectangle and framebuffer initialized");
+
     let buf = include_bytes!("../../dsk/ini/fonts/cp857-8x8.psf");
     let font = Font::try_from(&buf[..]).unwrap();
 
-    MOUSE_BUFFER.get().unwrap().clear_events();
+    kprintln!("Font loaded");
+
+    get_event_buffer().clear_events();
+
+    kprintln!("Mouse buffer cleared");
+
     // Hauptspielschleife
     loop {
         // Exit-Bedingungen prüfen
@@ -132,7 +138,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         let mut x_pos = 0;
         let mut y_pos = 0;
 
-        while let Some(event) = MOUSE_BUFFER.get().unwrap().get_last_event() {
+        while let Some(event) = get_event_buffer().get_last_event() {
             x_pos += event.x_movement;
             y_pos += event.y_movement;
             if event.is_left_click() {

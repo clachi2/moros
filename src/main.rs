@@ -19,7 +19,6 @@ fn main(boot_info: &'static BootInfo) -> ! {
             usr::shell::exec(cmd).ok();
             sys::acpi::shutdown();
         } else {
-            kprint!("HELLOOOO");
             user_boot();
         }
     }

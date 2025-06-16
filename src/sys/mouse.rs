@@ -4,8 +4,12 @@ use nolock::queues::mpmc::bounded::scq::{Receiver, Sender};
 use spin::{Mutex, Once};
 use x86_64::instructions::port::Port;
 
-pub static MOUSE_BUFFER: Once<MouseQueue> = Once::new();
+static MOUSE_BUFFER: Once<MouseQueue> = Once::new();
 static MOUSE: Mutex<Mouse> = Mutex::new(Mouse::new());
+
+pub fn get_event_buffer() -> &'static MouseQueue {
+    MOUSE_BUFFER.call_once(|| MouseQueue::new())
+}
 
 pub fn init() {
     log!("Initializing Mouse");
@@ -95,10 +99,6 @@ impl MouseQueue {
         }
         while let Ok(_) = self.receiver.try_dequeue() {}
     }
-}
-
-pub fn get_event_buffer() -> &'static MouseQueue {
-    MOUSE_BUFFER.call_once(|| MouseQueue::new())
 }
 
 struct Mouse {}
