@@ -1,5 +1,6 @@
 use alloc::boxed::Box;
 use alloc::vec;
+use alloc::vec::Vec;
 use crate::api::font::Font;
 use crate::api::fs::write;
 
@@ -9,7 +10,7 @@ pub struct Framebuffer {
     color_depth: usize,
     pitch: usize,
     file_path: &'static str,
-    internal_buffer: Box<[u8]>,
+    internal_buffer: Vec<u8>,
     buffer_size: usize,
 }
 
@@ -17,8 +18,7 @@ impl Framebuffer {
     pub fn new(width: usize, height: usize, color_depth: usize, file_path: &'static str) -> Self {
         let pitch = width * (color_depth / 8);
         let buffer_size: usize = height * pitch;
-        let mut vec = vec![0u8; buffer_size];
-        let internal_buffer = vec.into_boxed_slice();
+        let internal_buffer = vec![0u8; buffer_size];
 
         Framebuffer {
             width,
@@ -31,9 +31,13 @@ impl Framebuffer {
         }
     }
 
+    pub fn get_buffer(&self) -> &Vec<u8>{
+        &self.internal_buffer
+    }
+
     pub fn clear(&mut self) {
         for byte in self.internal_buffer.iter_mut() {
-            *byte = 0;
+            *byte = 0x00;
         }
     }
 

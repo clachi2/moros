@@ -2,8 +2,11 @@ use crate::api::font::Font;
 use crate::api::fs::write;
 use crate::api::process::ExitCode;
 use crate::sys::console;
-use crate::sys::mouse::{get_event_buffer};
+use crate::sys::mouse::get_event_buffer;
 use crate::sys::vga::framebuffer;
+use crate::usr::game::state;
+use crate::usr::game::renderer;
+use alloc::vec;
 
 //G640x480x16
 const WIDTH: usize = 320;
@@ -58,7 +61,7 @@ impl Rectangle {
     fn add_pos(&mut self, x: i8, y: i8) {
         if (self.x as i32 + x as i32) < 0 {
             self.x = 0;
-        } else if (self.x as i32 + x as i32)  > WIDTH as i32 {
+        } else if (self.x as i32 + x as i32) > WIDTH as i32 {
             self.x = WIDTH - 1;
         } else {
             self.x += x as usize;
@@ -73,40 +76,50 @@ impl Rectangle {
     }
 }
 
-struct Framebuffer {
-    buffer: [u8; WIDTH * HEIGHT],
-}
-
-impl Framebuffer {
-    fn new() -> Self {
-        Self {
-            buffer: [0; WIDTH * HEIGHT],
-        }
-    }
-
-    fn clear(&mut self) {
-        self.buffer = [0; WIDTH * HEIGHT];
-    }
-
-    fn set_pixel(&mut self, x: usize, y: usize, color: u8) {
-        if x < WIDTH && y < HEIGHT {
-            self.buffer[y * WIDTH + x] = color;
-        }
-    }
-
-    fn draw_rectangle(&mut self, rect: &Rectangle) {
-        for dy in 0..rect.height {
-            for dx in 0..rect.width {
-                self.set_pixel(rect.x + dx, rect.y + dy, rect.color);
-            }
-        }
-    }
-}
-
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
+    let mut my_map: state::Map = state::Map::new(WIDTH / 20 + 1, HEIGHT / 20 + 1);
+    let vertical_bitmap = vec![
+        true, false, false, false, false, false, true, false, true, false, false, false, true, false, false, false, true,
+        true, false, true, false, false, false, false, false, true, false, false, false, false, true, false, false, true,
+        true, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, true,
+        true, false, true, false, true, false, true, false, true, false, true, false, false, false, true, false, true,
+        true, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false, true,
+        true, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false, true,
+        true, false, true, false, false, false, true, false, true, false, true, false, true, false, true, false, true,
+        true, false, false, false, false, false, false, false, false, false, false, false, true, false, false, false, true,
+        true, false, false, true, false, false, false, false, true, false, false, false, false, false, true, false, true,
+        true, false, false, false, true, false, false, false, true, false, true, false, false, false, false, false, true,
+        true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true, // irrelevant
+    ];
+
+    let horizontal_bitmap = vec![
+        true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
+        false, true, false, false, false, false, false, false, false, true, true, false, false, false, false, false, false,
+        false, false, true, true, true, false, false, false, false, false, false, false, false, true, false, false, false,
+        false, true, false, false, false, false, false, true, false, false, false, true, true, false, true, false, false,
+        false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+        false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+        false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+        false, true, false, true, true, false, false, false, true, false, false, false, false, false, true, false, false,
+        false, false, true, false, false, false, false, false, false, false, false, true, true, true, false, false, false,
+        false, false, false, false, false, true, true, false, false, false, false, false, false, false, true, false, false,
+        true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
+    ];
+
+    my_map.set_vertical_walls_bitmap(&vertical_bitmap);
+    my_map.set_horizontal_walls_bitmap(&horizontal_bitmap);
+    // my_map.kprint_vec();
+
+    let mut renderer = renderer::Renderer::new(WIDTH, HEIGHT, 8, 20);
+    renderer.init();
+    renderer.draw_map(my_map);
+    renderer.draw();
+
+    loop {
+        // nothing
+    }
 
     kprintln!("Starting game...");
-
 
     write("/dev/vga/mode", b"320x200").expect("Could not switch to graphics mode");
     print!("\x1b[?25l"); // Cursor ausblenden
@@ -119,7 +132,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
 
     kprintln!("Rectangle and framebuffer initialized");
 
-    let buf = include_bytes!("../../dsk/ini/fonts/cp857-8x8.psf");
+    let buf = include_bytes!("../../../dsk/ini/fonts/cp857-8x8.psf");
     let font = Font::try_from(&buf[..]).unwrap();
 
     kprintln!("Font loaded");
@@ -177,7 +190,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
 
         fb.clear();
         fb.draw_rectangle(rect.x, rect.y, rect.width, rect.height, rect.color);
-        fb.draw_line(10,10, 100, 200, 0x1);
+        fb.draw_line(10, 10, 100, 200, 0x1);
         fb.draw_line(100, 10, 10, 200, 0x2);
         fb.draw_circle(150, 100, 50, 0x5, true);
         fb.draw_circle(200, 100, 50, 0x6, false);
