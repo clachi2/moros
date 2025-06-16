@@ -9,6 +9,7 @@ use alloc::string::ToString;
 use bit_field::BitField;
 use core::net::Ipv4Addr;
 use smoltcp::wire::{IpAddress, IpCidr};
+use crate::sys::net::socket::udp::UdpSocket;
 
 extern crate alloc;
 
@@ -38,16 +39,24 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
 
     println!("Connecting to TCP server on {}:{}", server_ip, server_port);
 
-    let mut client = TcpSocket::new();
+    let mut client = UdpSocket::new();
+    let mut client2 = UdpSocket::new();
 
     if let Err(e) = client.connect(server_ip, server_port) {
-        println!("Failed to connect to server: {:?}", e);
+        println!("1 Failed to connect to server: {:?}", e);
         return Err(ExitCode::Failure);
+    }
+    else {
+        if let Err(e) = client2.connect(server_ip, server_port) {
+        println!("2 Failed to connect to server: {:?}", e);
+        // return Err(ExitCode::Failure);
+    }
     }
 
     println!("Connected to server.");
 
     let mut count = 0;
+    let mut count2 = 0;
 
     loop {
         // Sende eine Nachricht an den Server
@@ -55,7 +64,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         client.read(&mut status_buf).ok();
 
         if client.poll(IO::Write) {
-            let message = format!("Hello from client {}! count: {}", last_digit, count);
+            let message = format!("1 Hello from client {}! count: {}", last_digit, count);
             if client.write(message.as_bytes()).is_err() {
                 println!("Failed to send message to server");
                 // break;
@@ -63,9 +72,19 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
             count += 1;
         }
 
+        if client2.poll(IO::Write) {
+            let message = format!("2 Hello from client {}! count: {}", last_digit, count2);
+            if client2.write(message.as_bytes()).is_err() {
+                println!("Failed to send message to server");
+                // break;
+            }
+            count2 += 1;
+        }
+
         // Empfange eine Antwort vom Server
         while client.poll(IO::Read) {
-            let mut buf = [0u8; 512];
+            println!("Client 1 received data from server");
+            let mut buf = [0u8; 1024];
             if let Ok(size) = client.read(&mut buf) {
                 let msg = &buf[..size];
                 println!(
@@ -74,31 +93,16 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                 );
             }
         }
-    }
-    return Ok(());
-
-    // Nachricht empfangen
-    let mut buf = [0u8; 128]; // Buffer eventuell etwas größer machen, falls die Server-Nachricht länger ist
-    match client.read(&mut buf) {
-        Ok(n) => {
-            if n > 0 {
-                println!("Read {} bytes from server.", n);
-                // Gib die empfangene Nachricht aus:
-                match core::str::from_utf8(&buf[..n]) {
-                    Ok(message) => println!("Received: {}", message.trim_end()), // trim_end() um eventuelle \n zu entfernen
-                    Err(_) => println!("Received (raw bytes): {:?}", &buf[..n]),
-                }
-            } else {
-                println!("Server closed the connection without sending data.");
+        while client2.poll(IO::Read) {
+            println!("Client 2 received data from server");
+            let mut buf = [0u8; 1024];
+            if let Ok(size) = client2.read(&mut buf) {
+                let msg = &buf[..size];
+                println!(
+                    "Server sent: {:?}",
+                    core::str::from_utf8(msg).unwrap_or("???")
+                );
             }
         }
-        Err(e) => {
-            println!("Failed to read from server: {:?}", e);
-        }
     }
-
-    client.close();
-    println!("Connection closed.");
-
-    Ok(())
 }

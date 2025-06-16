@@ -86,8 +86,33 @@ impl UdpSocket {
         Ok(())
     }
 
-    pub fn listen(&mut self, _port: u16) -> Result<(), ()> {
-        todo!()
+    pub fn listen(&mut self, port: u16) -> Result<(), ()> {
+        let timeout = 5.0;
+        let started = sys::clk::epoch_time();
+        if let Some((ref mut iface, ref mut device)) = *sys::net::NET.lock() {
+            let mut sockets = SOCKETS.lock();
+            loop {
+                if sys::clk::epoch_time() - started > timeout {
+                    return Err(());
+                }
+
+                iface.poll(sys::net::time(), device, &mut sockets);
+                let socket = sockets.get_mut::<udp::Socket>(self.handle);
+
+                if !socket.is_open() {
+                    let local_endpoint = IpListenEndpoint::from(port);
+                    socket.bind(local_endpoint).map_err(|_| ())?;
+                    return Ok(());
+                }
+
+                if let Some(d) = iface.poll_delay(sys::net::time(), &sockets) {
+                    wait(d);
+                }
+                sys::clk::halt();
+            }
+        } else {
+            Err(())
+        }
     }
 
     pub fn accept(&mut self) -> Result<IpAddress, ()> {
@@ -133,7 +158,6 @@ impl FileIO for UdpSocket {
     fn write(&mut self, buf: &[u8]) -> Result<usize, ()> {
         let timeout = 5.0;
         let started = sys::clk::epoch_time();
-        let mut sent = false;
         if let Some((ref mut iface, ref mut device)) = *sys::net::NET.lock() {
             let mut sockets = SOCKETS.lock();
             loop {
@@ -143,9 +167,6 @@ impl FileIO for UdpSocket {
                 iface.poll(sys::net::time(), device, &mut sockets);
                 let socket = sockets.get_mut::<udp::Socket>(self.handle);
 
-                if sent {
-                    break;
-                }
                 if socket.can_send() {
                     if let Some(endpoint) = self.remote_endpoint {
                         if socket.send_slice(buf.as_ref(), endpoint).is_err() {
@@ -154,7 +175,8 @@ impl FileIO for UdpSocket {
                     } else {
                         return Err(());
                     }
-                    sent = true; // Break after next poll
+                    iface.poll(sys::net::time(), device, &mut sockets);
+                    break;
                 }
 
                 if let Some(d) = iface.poll_delay(sys::net::time(), &sockets) {

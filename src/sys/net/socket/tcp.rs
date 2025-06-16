@@ -60,6 +60,7 @@ impl TcpSocket {
         if let Some((ref mut iface, ref mut device)) = *sys::net::NET.lock() {
             loop {
                 if sys::clk::epoch_time() - started > timeout {
+                    println!("Connection timed out");
                     return Err(());
                 }
                 let mut sockets = SOCKETS.lock();
@@ -69,11 +70,14 @@ impl TcpSocket {
                 match socket.state() {
                     tcp::State::Closed => {
                         if connecting {
+                            println!("Connection failed since already connecting");
+                            continue;
                             return Err(());
                         }
                         let cx = iface.context();
                         let dest = (addr, port);
                         if socket.connect(cx, dest, random_port()).is_err() {
+                            println!("Failed to connect to {}:{}", addr, port);
                             return Err(());
                         }
                         connecting = true;
@@ -84,7 +88,10 @@ impl TcpSocket {
                     }
                     _ => {
                         // Did something get sent before the connection closed?
-                        return if socket.can_recv() { Ok(()) } else { Err(()) };
+                        return if socket.can_recv() { Ok(()) } else {
+                            println!("Connection closed unexpectedly");
+                            Err(())
+                        };
                     }
                 }
 

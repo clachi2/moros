@@ -7,60 +7,53 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use alloc::{format, vec};
 use core::net::Ipv4Addr;
+use smoltcp::socket::udp;
 use smoltcp::wire::{IpAddress, IpCidr};
+use crate::sys::net::socket::SOCKETS;
+use crate::sys::net::socket::udp::UdpSocket;
 
 extern crate alloc;
 
-fn handle_single_client_connection() -> Result<(), String> {
-    run_server(1234);
+fn run_server2(port: u16) {
+    let mut socket = UdpSocket::new();
+    socket.listen(port).unwrap();
 
-    println!("Neuer Socket wird erstellt und auf Port 1234 gelauscht...");
-    let mut connection_socket = TcpSocket::new();
+    let mut buf = [0u8; 1024];
+    let mut count = 0;
 
-    if let Err(_e) = connection_socket.listen(1234) {
-        return Err("Fehler beim Lauschen auf Port 1234".to_string());
-    }
-    println!("Server lauscht auf Port 1234...");
+    loop {
+        if socket.poll(IO::Read) {
+            // Receive message and get sender's endpoint
+            if let Ok((size, remote_endpoint)) = {
+                let mut sockets = SOCKETS.lock();
+                let socket = sockets.get_mut::<udp::Socket>(socket.handle);
+                socket.recv_slice(&mut buf).map_err(|_| ())
+            } {
+                let msg = &buf[..size];
+                println!("Received from {:?}: {:?}", remote_endpoint,
+                    core::str::from_utf8(msg).unwrap_or("???"));
 
-    match connection_socket.accept() {
-        Ok(client_ip) => {
-            println!("Verbindung akzeptiert von: {:?}", client_ip);
+                // Prepare response
+                let response = format!("Server response {} to {:?}", count, remote_endpoint);
+                count += 1;
 
-            // Sende eine Nachricht an den Client
-            let response = "Hallo vom Server!\n";
-            if let Err(_e) = connection_socket.write(response.as_bytes()) {
-                // Optional: Gib mehr Fehlerdetails aus
-                // println!("Fehler beim Senden der Daten an {:?}: {:?}", client_ip, e);
-                connection_socket.close(); // Wichtig: Socket auch im Fehlerfall schließen
-                return Err(format!(
-                    "Fehler beim Senden der Daten an Client {:?}",
-                    client_ip
-                ));
+                // Send response back to same endpoint
+                if socket.poll(IO::Write) {
+                    let mut sockets = SOCKETS.lock();
+                    let socket = sockets.get_mut::<udp::Socket>(socket.handle);
+                    socket.send_slice(response.as_bytes(), remote_endpoint).ok();
+                }
             }
-            println!("Antwort an Client {:?} gesendet.", client_ip);
-
-            // Schließe die Verbindung zu diesem spezifischen Client
-            connection_socket.close();
-            println!("Verbindung mit {:?} geschlossen.", client_ip);
-            Ok(()) // Alles gut für diesen Client
         }
-        Err(_e) => {
-            connection_socket.close();
-            Err("Fehler beim Akzeptieren der Verbindung.".to_string())
-        }
+        sys::clk::halt();
     }
-}
-
-struct Client {
-    socket: TcpSocket,
-    ip: IpAddress,
 }
 
 fn run_server(port: u16) {
-    let mut listener = TcpSocket::new();
+    let mut listener = UdpSocket::new();
     listener.listen(port).unwrap();
 
-    let mut clients: Vec<TcpSocket> = Vec::new();
+    let mut clients: Vec<UdpSocket> = Vec::new();
 
     let mut count = 0;
 
@@ -70,7 +63,7 @@ fn run_server(port: u16) {
             if let Ok(remote_ip) = listener.accept() {
                 println!("New connection from {:?}", remote_ip);
 
-                let connected_socket = core::mem::replace(&mut listener, TcpSocket::new());
+                let connected_socket = core::mem::replace(&mut listener, UdpSocket::new());
                 clients.push(connected_socket);
 
                 // Replace listener so it can accept again
@@ -120,20 +113,8 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     println!("TCP Server startet und behandelt Clients sequenziell.");
     println!("IP konfiguriert auf {}", addr);
 
-    loop {
-        match handle_single_client_connection() {
-            Ok(_) => {
-                println!("Client erfolgreich bedient. Bereit für den nächsten Client.");
-            }
-            Err(e_msg) => {
-                println!(
-                    "Ein Fehler ist bei der Client-Behandlung aufgetreten: {}",
-                    e_msg
-                );
+    // run_server(1234);
+    run_server2(1234);
 
-                println!("Versuche erneut, auf einen Client zu warten...");
-            }
-        }
-        println!("----------------------------------------------------");
-    }
+    Ok(())
 }
