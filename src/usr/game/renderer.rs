@@ -36,16 +36,16 @@ impl Renderer {
 
     pub fn draw(&mut self) {
 
-        self.framebuffer.draw_line(0, 0, 320, 200, 0x3); // Example line for testing
-
-
-
-        //draw 255 rainbow
-        for y in 0..self.screen_height {
-            for x in 0..255 {
-                self.framebuffer.draw_pixel(x, y, x as u8);
-            }
-        }
+        // self.framebuffer.draw_line(0, 0, 320, 200, 0x3); // Example line for testing
+        //
+        //
+        //
+        // //draw 255 rainbow
+        // for y in 0..self.screen_height {
+        //     for x in 0..255 {
+        //         self.framebuffer.draw_pixel(x, y, x as u8);
+        //     }
+        // }
 
         // flush framebuffer to file
         self.framebuffer.flush();
@@ -64,7 +64,7 @@ impl Renderer {
 
                     // Draw a vertical line on the left side of the tile
                     for dy in 0..self.tile_size {
-                        self.framebuffer.draw_pixel(screen_x, screen_y + dy, 0xE);
+                        self.framebuffer.draw_pixel(screen_x, screen_y + dy, 0xFF);
                     }
                 }
                 if map.horizontal_walls[y * map.tiles_x + x] {
@@ -73,7 +73,7 @@ impl Renderer {
 
                     // Draw a horizontal line on the top of the tile
                     for dx in 0..self.tile_size {
-                        self.framebuffer.draw_pixel(screen_x + dx, screen_y, 0xE);
+                        self.framebuffer.draw_pixel(screen_x + dx, screen_y, 0xFF);
                     }
                 }
             }

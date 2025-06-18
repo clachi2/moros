@@ -3,7 +3,7 @@ use crate::api::fs::write;
 use crate::api::process::ExitCode;
 use crate::sys::console;
 use crate::sys::mouse::get_event_buffer;
-use crate::sys::vga::framebuffer;
+use crate::sys::vga::{framebuffer, VgaPalette};
 use crate::usr::game::state;
 use crate::usr::game::renderer;
 use alloc::vec;
@@ -77,6 +77,10 @@ impl Rectangle {
 }
 
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
+    //set color palette
+    VgaPalette::vga_256().write();
+
+
     let mut my_map: state::Map = state::Map::new(WIDTH / 20 + 1, HEIGHT / 20 + 1);
     let vertical_bitmap = vec![
         true, false, false, false, false, false, true, false, true, false, false, false, true, false, false, false, true,
