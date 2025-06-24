@@ -29,7 +29,7 @@ pub fn init() {
 }
 
 fn mouse_irq_handler() {
-    let event = MOUSE.lock().internal_irq_handler();
+    let event    = MOUSE.lock().internal_irq_handler();
     if let Some(event) = event {
         get_event_buffer().push_event(event);
     }

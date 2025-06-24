@@ -1,216 +1,117 @@
-use crate::api::font::Font;
-use crate::api::fs::write;
-use crate::api::process::ExitCode;
-use crate::sys::console;
-use crate::sys::mouse::get_event_buffer;
-use crate::sys::vga::{framebuffer, VgaPalette};
-use crate::usr::game::state;
+use crate::sys::clk::epoch_time;
 use crate::usr::game::renderer;
-use alloc::vec;
+use crate::usr::game::state;
+use alloc::vec::Vec;
 
-//G640x480x16
-const WIDTH: usize = 320;
-const HEIGHT: usize = 200;
-struct Rectangle {
-    x: usize,
-    y: usize,
-    width: usize,
-    height: usize,
-    color: u8,
+
+pub(crate) struct Game {
+    game_state: state::GameState,
+    renderer: renderer::Renderer,
 }
 
-impl Rectangle {
-    fn new(x: usize, y: usize, width: usize, height: usize, color: u8) -> Self {
-        Self {
-            x,
-            y,
-            width,
-            height,
-            color,
+impl Game {
+    pub fn new(width: usize, height: usize) -> Self {
+        let game_state = state::GameState::new();
+        let renderer = renderer::Renderer::new(width, height, 8, 12, 10, 20);
+        Game {
+            game_state,
+            renderer,
         }
     }
 
-    fn move_left(&mut self) {
-        if self.x > 0 {
-            self.x -= 5;
-        }
+    pub fn init(&mut self) {
+        self.renderer.init();
+        self.game_state.map.set_test_map();
+        self.renderer.draw_map_buffer(self.game_state.map.clone());
+
+        // tests
+        self.game_state.players.push(state::Player {
+            id: 0,
+            x: 5.0,
+            y: 5.0,
+            alive: true,
+            time_of_death: 0.0,
+            driving_direction: state::Direction{
+                up: false,
+                right: false,
+                down: false,
+                left: false,
+            },
+            pointing_to: (0, 0),
+            color: 0x0f,
+            points: 0,
+            ammo: 5,
+            last_shot: 0.0,
+        });
     }
 
-    fn move_right(&mut self) {
-        if self.x + self.width < WIDTH {
-            self.x += 5;
-        }
-    }
+    pub fn tick(&mut self) {
+        // TODO update game state, handle input, etc.
 
-    fn move_up(&mut self) {
-        if self.y > 0 {
-            self.y -= 5;
-        }
-    }
+        // Tick timing
+        let current_time = epoch_time();
+        let tick_delta = current_time - self.game_state.last_tick;
+        self.game_state.last_tick = current_time;
 
-    fn move_down(&mut self) {
-        if self.y + self.height < HEIGHT {
-            self.y += 5;
-        }
-    }
+        // update Player positions
+        for player in &self.game_state.players {
+            if player.alive {
+                // new wanted position based on movement direction and tick delta
+                let new_pos = player.next_wanted_position(tick_delta);
+                // get closest position on line from x,y to new_x,new_y without going through walls
 
-    fn set_color(&mut self, color: u8) {
-        self.color = color;
-    }
-
-    fn add_pos(&mut self, x: i8, y: i8) {
-        if (self.x as i32 + x as i32) < 0 {
-            self.x = 0;
-        } else if (self.x as i32 + x as i32) > WIDTH as i32 {
-            self.x = WIDTH - 1;
-        } else {
-            self.x += x as usize;
-        }
-        if (self.y as i32 + y as i32) < 0 {
-            self.y = 0;
-        } else if (self.y as i32 + y as i32) > HEIGHT as i32 {
-            self.y = HEIGHT - 1;
-        } else {
-            self.y += y as usize;
-        }
-    }
-}
-
-pub fn main(args: &[&str]) -> Result<(), ExitCode> {
-    //set color palette
-    VgaPalette::vga_256().write();
-
-
-    let mut my_map: state::Map = state::Map::new(WIDTH / 20 + 1, HEIGHT / 20 + 1);
-    let vertical_bitmap = vec![
-        true, false, false, false, false, false, true, false, true, false, false, false, true, false, false, false, true,
-        true, false, true, false, false, false, false, false, true, false, false, false, false, true, false, false, true,
-        true, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, true,
-        true, false, true, false, true, false, true, false, true, false, true, false, false, false, true, false, true,
-        true, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false, true,
-        true, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false, true,
-        true, false, true, false, false, false, true, false, true, false, true, false, true, false, true, false, true,
-        true, false, false, false, false, false, false, false, false, false, false, false, true, false, false, false, true,
-        true, false, false, true, false, false, false, false, true, false, false, false, false, false, true, false, true,
-        true, false, false, false, true, false, false, false, true, false, true, false, false, false, false, false, true,
-        true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true, // irrelevant
-    ];
-
-    let horizontal_bitmap = vec![
-        true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
-        false, true, false, false, false, false, false, false, false, true, true, false, false, false, false, false, false,
-        false, false, true, true, true, false, false, false, false, false, false, false, false, true, false, false, false,
-        false, true, false, false, false, false, false, true, false, false, false, true, true, false, true, false, false,
-        false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-        false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-        false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
-        false, true, false, true, true, false, false, false, true, false, false, false, false, false, true, false, false,
-        false, false, true, false, false, false, false, false, false, false, false, true, true, true, false, false, false,
-        false, false, false, false, false, true, true, false, false, false, false, false, false, false, true, false, false,
-        true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true,
-    ];
-
-    my_map.set_vertical_walls_bitmap(&vertical_bitmap);
-    my_map.set_horizontal_walls_bitmap(&horizontal_bitmap);
-    // my_map.kprint_vec();
-
-    let mut renderer = renderer::Renderer::new(WIDTH, HEIGHT, 8, 20);
-    renderer.init();
-    renderer.draw_map(my_map);
-    renderer.draw();
-
-    loop {
-        // nothing
-    }
-
-    kprintln!("Starting game...");
-
-    write("/dev/vga/mode", b"320x200").expect("Could not switch to graphics mode");
-    print!("\x1b[?25l"); // Cursor ausblenden
-
-    kprintln!("Framebuffer resolution set to 320x200");
-
-    // let mut fb = Framebuffer::new();
-    let mut fb = framebuffer::Framebuffer::new(320, 200, 8, "/dev/vga/buffer");
-    let mut rect = Rectangle::new(WIDTH / 2 - 20, HEIGHT / 2 - 20, 10, 10, 0x3);
-
-    kprintln!("Rectangle and framebuffer initialized");
-
-    let buf = include_bytes!("../../../dsk/ini/fonts/cp857-8x8.psf");
-    let font = Font::try_from(&buf[..]).unwrap();
-
-    kprintln!("Font loaded");
-
-    get_event_buffer().clear_events();
-
-    kprintln!("Mouse buffer cleared");
-
-    // Hauptspielschleife
-    loop {
-        // Exit-Bedingungen prüfen
-        if console::end_of_text() || console::end_of_transmission() {
-            break;
-        }
-
-        let mut x_pos = 0;
-        let mut y_pos = 0;
-
-        while let Some(event) = get_event_buffer().get_last_event() {
-            x_pos += event.x_movement;
-            y_pos += event.y_movement;
-            if event.is_left_click() {
-                rect.set_color(0x4);
-            } else {
-                rect.set_color(0x3);
             }
         }
 
-        rect.add_pos(x_pos, y_pos);
-
-        // Tastatureingaben verarbeiten - non-blocking
-        console::disable_echo();
-        console::enable_raw();
-        {
-            let mut stdin = console::STDIN.lock();
-            if !stdin.is_empty() {
-                match stdin.remove(0) {
-                    'q' => break,
-                    'w' => rect.move_up(),
-                    's' => rect.move_down(),
-                    'a' => rect.move_left(),
-                    'd' => rect.move_right(),
-                    _ => {}
-                }
-            }
-        }
-        console::enable_echo();
-        console::disable_raw();
-
-        // Rendern
-        // fb.clear();
-        // fb.draw_rectangle(&rect);
-        //
-        // write("/dev/vga/buffer", &fb.buffer).expect("Could not write to buffer");
-
-        fb.clear();
-        fb.draw_rectangle(rect.x, rect.y, rect.width, rect.height, rect.color);
-        fb.draw_line(10, 10, 100, 200, 0x1);
-        fb.draw_line(100, 10, 10, 200, 0x2);
-        fb.draw_circle(150, 100, 50, 0x5, true);
-        fb.draw_circle(200, 100, 50, 0x6, false);
-
-        fb.draw_text(10, 10, "Hallo Welt!", 0x7, &font, 1.0);
-        fb.flush();
-
-        // Frame-Rate Kontrolle
-        for _ in 0..1000 {
-            core::hint::spin_loop();
-        }
+        // update Bullet positions
+        // check Collisions between Players and Bullets
+        // check if dead players need to respawn
     }
 
-    // Aufräumen
-    print!("\x1b[?25h");
-    write("/dev/vga/mode", b"80x25").expect("Could not return to text mode");
+    pub fn draw(&mut self) {
+        // TODO draw game state, players, bullets, etc.
+        self.renderer.draw_map();
+        for player in &self.game_state.players {
+            if player.alive {
+                self.renderer.draw_player(
+                    player.x as usize,
+                    player.y as usize,
+                    player.color,
+                    player.driving_direction.clone(),
+                );
+            }
+        }
+        self.renderer.flush();
+    }
 
-    Ok(())
+    pub fn set_and_draw_map(&mut self, map: state::Map) {
+        self.game_state.map = map.clone();
+        self.renderer.draw_map_buffer(map);
+    }
+
+    pub fn set_player_movement(&mut self, player_id: usize, direction: state::Direction) {
+        // TODO overwrite player movement direction
+    }
+
+    pub fn try_shoot(&mut self, player_id: usize) {
+        // TODO check if player can shoot and handle shooting logic
+    }
+
+    pub fn serialize_state(&self) -> Vec<u8> {
+        // TODO serialize game state to bytes for network transmission
+        Vec::new() // Placeholder
+    }
+
+    pub fn serialize_map(&self) -> Vec<u8> {
+        // TODO serialize map data to bytes for network transmission
+        Vec::new() // Placeholder
+    }
+
+    pub fn deserialize_state(&mut self, data: &[u8]) {
+        // TODO deserialize game state from bytes received over the network
+    }
+
+    pub fn deserialize_map(&mut self, data: &[u8]) {
+        // TODO deserialize map data from bytes received over the network
+    }
 }

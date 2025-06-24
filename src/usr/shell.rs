@@ -565,7 +565,7 @@ fn dispatch(args: &[&str], config: &mut Config) -> Result<(), ExitCode> {
         "view"     => usr::view::main(args),
         "write"    => usr::write::main(args),
         "panic"    => panic!("{}", args[1..].join(" ")),
-        "game"     => usr::game::game::main(args),
+        "game"     => usr::game::main::main(args),
         "server"   => usr::server::main(args),
         "client"   => usr::client::main(args),
         _ => {

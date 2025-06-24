@@ -1,8 +1,9 @@
-use alloc::boxed::Box;
-use alloc::vec;
-use alloc::vec::Vec;
+use crate::kprint;
+use crate::kprintln;
 use crate::api::font::Font;
 use crate::api::fs::write;
+use alloc::vec;
+use alloc::vec::Vec;
 
 pub struct Framebuffer {
     width: usize,
@@ -31,7 +32,30 @@ impl Framebuffer {
         }
     }
 
-    pub fn get_buffer(&self) -> &Vec<u8>{
+    pub fn copy_from(&mut self, other: &Framebuffer) {
+        if self.width != other.width
+            || self.height != other.height
+            || self.color_depth != other.color_depth
+        {
+            panic!("Cannot copy from framebuffer with different dimensions or color depth");
+        }
+        self.internal_buffer.copy_from_slice(&other.internal_buffer);
+    }
+
+    pub fn copy_from_at(&mut self, other: &Framebuffer, x: usize, y: usize) {
+        if self.width < x + other.width || self.height < y + other.height {
+            panic!("Cannot copy from framebuffer at position outside of bounds");
+        }
+        for dy in 0..other.height {
+            for dx in 0..other.width {
+                let src_index = dy * other.pitch + dx * (other.color_depth / 8);
+                let dest_index = (y + dy) * self.pitch + (x + dx) * (self.color_depth / 8);
+                self.internal_buffer[dest_index] = other.internal_buffer[src_index];
+            }
+        }
+    }
+
+    pub fn get_buffer(&self) -> &Vec<u8> {
         &self.internal_buffer
     }
 
@@ -95,10 +119,34 @@ impl Framebuffer {
 
         while x >= y {
             if filled {
-                self.draw_line(cx - x as usize, cy + y as usize, cx + x as usize, cy + y as usize, color);
-                self.draw_line(cx - x as usize, cy - y as usize, cx + x as usize, cy - y as usize, color);
-                self.draw_line(cx - y as usize, cy + x as usize, cx + y as usize, cy + x as usize, color);
-                self.draw_line(cx - y as usize, cy - x as usize, cx + y as usize, cy - x as usize, color);
+                self.draw_line(
+                    cx - x as usize,
+                    cy + y as usize,
+                    cx + x as usize,
+                    cy + y as usize,
+                    color,
+                );
+                self.draw_line(
+                    cx - x as usize,
+                    cy - y as usize,
+                    cx + x as usize,
+                    cy - y as usize,
+                    color,
+                );
+                self.draw_line(
+                    cx - y as usize,
+                    cy + x as usize,
+                    cx + y as usize,
+                    cy + x as usize,
+                    color,
+                );
+                self.draw_line(
+                    cx - y as usize,
+                    cy - x as usize,
+                    cx + y as usize,
+                    cy - x as usize,
+                    color,
+                );
             } else {
                 self.draw_pixel(cx + x as usize, cy + y as usize, color);
                 self.draw_pixel(cx - x as usize, cy + y as usize, color);
@@ -152,6 +200,27 @@ impl Framebuffer {
             }
 
             cursor_x += 8.0 * scale;
+        }
+    }
+
+    pub fn draw_bitmap(
+        &mut self,
+        x: usize,
+        y: usize,
+        bitmap: &[bool],
+        width: usize,
+        height: usize,
+        fg: u8,
+        bg: u8,
+    ) {
+        for dy in 0..height {
+            for dx in 0..width {
+                if bitmap[dy * width + dx] {
+                    self.draw_pixel(x + dx, y + dy, fg);
+                } else {
+                    self.draw_pixel(x + dx, y + dy, bg);
+                }
+            }
         }
     }
 }

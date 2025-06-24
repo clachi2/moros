@@ -49,57 +49,6 @@ fn run_server2(port: u16) {
     }
 }
 
-fn run_server(port: u16) {
-    let mut listener = UdpSocket::new();
-    listener.listen(port).unwrap();
-
-    let mut clients: Vec<UdpSocket> = Vec::new();
-
-    let mut count = 0;
-
-    loop {
-        // Check for new connection
-        if listener.poll(IO::Read) {
-            if let Ok(remote_ip) = listener.accept() {
-                println!("New connection from {:?}", remote_ip);
-
-                let connected_socket = core::mem::replace(&mut listener, UdpSocket::new());
-                clients.push(connected_socket);
-
-                // Replace listener so it can accept again
-                listener.listen(port).unwrap();
-            }
-        }
-
-        // Handle connected clients
-        for client in clients.iter_mut() {
-            while client.poll(IO::Read) {
-                let mut buf = [0u8; 1024];
-                if let Ok(size) = client.read(&mut buf) {
-                    if size > 0 {
-                        let msg = &buf[..size];
-                        println!(
-                            "Client sent: {:?}",
-                            core::str::from_utf8(msg).unwrap_or("???")
-                        );
-
-                        if client.poll(IO::Write) {
-                            // Here we can send a response back to the client
-                            println!("Sending response to client...");
-                            // For example, we can send a simple "pong" message
-                            let reply = format!("Answer from Server with count: {}" , count);
-                            client.write(reply.as_bytes()).ok();
-                            count += 1;
-                        }
-                    }
-                }
-            }
-        }
-
-        sys::clk::halt();
-    }
-}
-
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     let addr = IpAddress::from(Ipv4Addr::new(192, 168, 0, 1));
 
