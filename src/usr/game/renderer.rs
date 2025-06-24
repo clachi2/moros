@@ -1,9 +1,6 @@
 use crate::api::fs::write;
-use crate::sys;
 use crate::sys::vga::{VgaPalette, framebuffer};
-use crate::usr::game::state::{Direction, Map, GUI_WIDTH, PLAYER_SIZE};
-use alloc::vec;
-use alloc::vec::Vec;
+use crate::usr::game::state::{GUI_WIDTH, Map, PLAYER_SIZE};
 
 pub(crate) struct Renderer {
     screen_width: usize,
@@ -60,13 +57,19 @@ impl Renderer {
         self.framebuffer.flush();
     }
 
-    pub fn draw_player(&mut self, x: usize, y: usize, color: u8, direction: Direction) {
+    pub fn draw_player(&mut self, x: usize, y: usize, color: u8) {
         for dy in 0..PLAYER_SIZE {
             for dx in 0..PLAYER_SIZE {
-                self.map_buffer
-                    .draw_pixel(x + dx, y + dy, color);
+                self.map_buffer.draw_pixel(x + dx, y + dy, color);
             }
         }
+    }
+
+    pub fn draw_mouse_cursor(&mut self, x: usize, y: usize) {
+        // Draw a simple crosshair as mouse cursor
+        let cursor_color = 0x0f; // White color
+        self.framebuffer.draw_line(x - 4, y, x + 4, y, cursor_color);
+        self.framebuffer.draw_line(x, y - 4, x, y + 4, cursor_color);
     }
 
     pub fn draw_map(&mut self) {

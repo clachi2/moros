@@ -1,6 +1,7 @@
-use crate::sys::clk::epoch_time;
+use crate::sys::clk::boot_time;
 use crate::usr::game::renderer;
 use crate::usr::game::state;
+use crate::usr::game::state::TICK_RATE;
 use alloc::vec::Vec;
 
 pub(crate) struct Game {
@@ -30,11 +31,14 @@ impl Game {
             y: 5.0,
             alive: true,
             time_of_death: 0.0,
-            driving_direction: state::Direction {
+            user_input: state::UserInput {
                 up: false,
                 right: false,
                 down: false,
                 left: false,
+                shooting: false,
+                map_mouse_x: 0,
+                map_mouse_y: 0,
             },
             pointing_to: (0, 0),
             color: 0x0f,
@@ -48,22 +52,15 @@ impl Game {
         // TODO update game state, handle input, etc.
 
         // Tick timing
-        let current_time = epoch_time();
+        let current_time = boot_time();
         let tick_delta = current_time - self.game_state.last_tick;
+        if tick_delta < 1.0 / TICK_RATE {
+            return; // Not enough time has passed for the next tick
+        }
         self.game_state.last_tick = current_time;
 
         // update Player positions
         for player in &mut self.game_state.players {
-            // kprintln!(
-            //     "Player ID: {}, Position: ({}, {}), Directions: ({},{},{},{})",
-            //     player.id,
-            //     player.x,
-            //     player.y,
-            //     player.driving_direction.up,
-            //     player.driving_direction.right,
-            //     player.driving_direction.down,
-            //     player.driving_direction.left
-            // );
             if player.alive {
                 // new wanted position based on movement direction and tick delta
                 let new_pos = player.next_wanted_position(tick_delta);
@@ -83,14 +80,15 @@ impl Game {
         self.renderer.draw_map();
         for player in &self.game_state.players {
             if player.alive {
-                self.renderer.draw_player(
-                    player.x as usize,
-                    player.y as usize,
-                    player.color,
-                    player.driving_direction.clone(),
-                );
+                self.renderer
+                    .draw_player(player.x as usize, player.y as usize, player.color);
             }
         }
+        // Draw mouse cursor
+        let mouse_x = self.game_state.players[0].user_input.map_mouse_x; // TODO get index from somewhere else
+        let mouse_y = self.game_state.players[0].user_input.map_mouse_y;
+        self.renderer.draw_mouse_cursor(mouse_x, mouse_y);
+
         self.renderer.flush();
     }
 
@@ -99,14 +97,23 @@ impl Game {
         self.renderer.draw_map_buffer(map);
     }
 
-    pub fn set_player_movement(&mut self, player_id: usize, direction: state::Direction) {
+    pub fn set_user_input(&mut self, player_id: usize, input: state::UserInput) {
         if let Some(player) = self.game_state.players.get_mut(player_id) {
-            player.driving_direction = direction;
+            player.user_input = input;
         }
     }
 
     pub fn try_shoot(&mut self, player_id: usize) {
         // TODO check if player can shoot and handle shooting logic
+    }
+
+    pub fn serialize_user_input(&self) -> Vec<u8> {
+        // TODO serialize user input for network transmission
+        Vec::new() // Placeholder
+    }
+
+    pub fn deserialize_user_input(&mut self, data: &[u8]) {
+        // TODO deserialize user input from bytes received over the network
     }
 
     pub fn serialize_state(&self) -> Vec<u8> {

@@ -1,4 +1,3 @@
-use alloc::format;
 use crate::api::fs;
 use crate::sys::net::socket::udp::UdpSocket;
 use alloc::string::{String, ToString};
@@ -7,12 +6,10 @@ use core::net::Ipv4Addr;
 use core::str::FromStr;
 use nolock::queues::mpmc;
 use nolock::queues::mpmc::bounded::scq::{Receiver, Sender};
-use smoltcp::socket::udp;
 use smoltcp::socket::udp::UdpMetadata;
 use smoltcp::wire::{IpAddress, IpCidr};
-use spin::{Mutex, Once};
-use crate::api::fs::{FileIO, IO};
-use crate::sys::net::socket::SOCKETS;
+use spin::{Once};
+use crate::api::fs::{FileIO};
 
 const BUFFER_SIZE: usize = 1024;
 

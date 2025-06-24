@@ -1,9 +1,9 @@
-use crate::kprint;
-use crate::kprintln;
 use crate::api::font::Font;
 use crate::api::fs::write;
 use alloc::vec;
 use alloc::vec::Vec;
+use crate::kprintln;
+use crate::kprint;
 
 pub struct Framebuffer {
     width: usize,
@@ -78,6 +78,12 @@ impl Framebuffer {
     }
 
     pub fn draw_line(&mut self, x1: usize, y1: usize, x2: usize, y2: usize, color: u8) {
+
+        if x1 >= self.width || y1 >= self.height || x2 >= self.width || y2 >= self.height {
+            kprintln!("draw_line: coordinates out of bounds");
+            return;
+        }
+
         let dx = (x2 as isize - x1 as isize).abs();
         let dy = (y2 as isize - y1 as isize).abs();
         let sx = if x1 < x2 { 1 } else { -1 };

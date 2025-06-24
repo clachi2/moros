@@ -7,7 +7,7 @@ use x86_64::instructions::port::Port;
 static MOUSE_BUFFER: Once<MouseQueue> = Once::new();
 static MOUSE: Mutex<Mouse> = Mutex::new(Mouse::new());
 
-pub fn get_event_buffer() -> &'static MouseQueue {
+pub fn get_mouse_buffer() -> &'static MouseQueue {
     MOUSE_BUFFER.call_once(|| MouseQueue::new())
 }
 
@@ -31,7 +31,7 @@ pub fn init() {
 fn mouse_irq_handler() {
     let event    = MOUSE.lock().internal_irq_handler();
     if let Some(event) = event {
-        get_event_buffer().push_event(event);
+        get_mouse_buffer().push_event(event);
     }
 }
 

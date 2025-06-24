@@ -1,9 +1,9 @@
-use core::cmp::Ordering;
 use crate::api::console::Style;
 use crate::api::process::ExitCode;
 use crate::sys;
 use crate::sys::keyboard::{DOWN, LEFT, RIGHT, UP};
-use crate::usr::game::state::Direction;
+use crate::sys::mouse::get_mouse_buffer;
+use crate::usr::game::state::{UserInput, GUI_WIDTH};
 
 //G640x480x16
 const WIDTH: usize = 320;
@@ -21,32 +21,60 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     let mut game = crate::usr::game::game::Game::new(WIDTH, HEIGHT);
     game.init();
     kprintln!("Starting game...");
+
+    let mut mouse_x: i32 = 0;
+    let mut mouse_y: i32 = 0;
+    get_mouse_buffer().clear_events();
+
     loop {
-        // TODO get mouse and keyboard input
-        // TODO parse input to game
+        // parse input to game
+        let user_input = get_user_input(&mut mouse_x, &mut mouse_y);
+        game.set_user_input(0, user_input);
+
         game.tick();
         game.draw();
-        let ord = core::sync::atomic::Ordering::Relaxed;
-        let up = UP.load(ord);
-        let down = DOWN.load(ord);
-        let left = LEFT.load(ord);
-        let right = RIGHT.load(ord);
-        // if up || down || left || right {
-        //     kprintln!(
-        //         "Input: up={}, down={}, left={}, right={}",
-        //         up, down, left, right
-        //     );
-        // }
-        game.set_player_movement(0, Direction {
-            up,
-            down,
-            left,
-            right,
-        });
         sys::clk::halt();
     }
 
     Ok(())
+}
+
+fn get_user_input(mouse_x: &mut i32, mouse_y: &mut i32) -> UserInput {
+    // get mouse and keyboard input
+    let ord = core::sync::atomic::Ordering::Relaxed;
+    let up = UP.load(ord);
+    let down = DOWN.load(ord);
+    let left = LEFT.load(ord);
+    let right = RIGHT.load(ord);
+    let mut shooting = false;
+    while let Some(event) = get_mouse_buffer().get_last_event() {
+        *mouse_x += event.x_movement as i32;
+        *mouse_y += event.y_movement as i32;
+        if *mouse_x < 0 {
+            *mouse_x = 0;
+        } else if *mouse_x >= WIDTH as i32 {
+            *mouse_x = (WIDTH - 1) as i32;
+        }
+        if *mouse_y < 0 {
+            *mouse_y = 0;
+        } else if *mouse_y >= HEIGHT as i32 {
+            *mouse_y = (HEIGHT - 1) as i32;
+        }
+        shooting = shooting | event.is_left_click(); // shooting if left mouse button is pressed atleast once per tick
+    }
+    let map_mouse_x = *mouse_x as usize;
+    let map_mouse_y = *mouse_y as usize;
+
+    let user_input = UserInput {
+        up,
+        down,
+        left,
+        right,
+        shooting,
+        map_mouse_x,
+        map_mouse_y,
+    };
+    user_input
 }
 
 pub fn help() -> Result<(), ExitCode> {

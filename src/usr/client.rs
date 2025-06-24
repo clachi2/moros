@@ -1,12 +1,8 @@
 use crate::api::fs;
 use crate::api::fs::{FileIO, IO};
 use crate::api::process::ExitCode;
-use crate::sys::net::SocketStatus;
-use crate::sys::net::socket::tcp::TcpSocket;
-use crate::sys::syscall::service::exit;
 use alloc::format;
 use alloc::string::ToString;
-use bit_field::BitField;
 use core::net::Ipv4Addr;
 use smoltcp::wire::{IpAddress, IpCidr};
 use crate::sys::net::socket::udp::UdpSocket;

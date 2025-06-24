@@ -6,6 +6,7 @@ pub static PLAYER_SIZE: usize = 8; // Size of the player in pixels
 pub static BULLET_SPEED: f64 = 20.0; // Speed of bullet movement per tick
 pub static BULLET_SIZE: usize = 4; // Size of the bullet in pixels
 pub static GUI_WIDTH: usize = 80;
+pub static TICK_RATE: f64 = 32.0; // Number of ticks per second
 
 pub(crate) trait Serializable {
     fn serialize(&self) -> Vec<u8>;
@@ -40,20 +41,28 @@ impl Clone for Map {
     }
 }
 
-pub(crate) struct Direction {
+pub(crate) struct UserInput {
+    // keyboard input
     pub(crate) up: bool,
     pub(crate) right: bool,
     pub(crate) down: bool,
     pub(crate) left: bool,
+    // mouse input
+    pub(crate) shooting: bool,
+    pub(crate) map_mouse_x: usize,
+    pub(crate) map_mouse_y: usize,
 }
 
-impl Clone for Direction {
+impl Clone for UserInput {
     fn clone(&self) -> Self {
-        Direction {
+        UserInput {
             up: self.up,
             right: self.right,
             down: self.down,
             left: self.left,
+            shooting: self.shooting,
+            map_mouse_x: self.map_mouse_x,
+            map_mouse_y: self.map_mouse_y,
         }
     }
 }
@@ -64,7 +73,7 @@ pub(crate) struct Player {
     pub(crate)y: f64,
     pub(crate)alive: bool,
     pub(crate)time_of_death: f64, // Timestamp of death (get using time::epoch_time())
-    pub(crate)driving_direction: Direction,
+    pub(crate)user_input: UserInput,
     pub(crate)pointing_to: (usize, usize),
     pub(crate)color: u8,
     pub(crate)points: usize,
@@ -80,7 +89,7 @@ impl Clone for Player {
             y: self.y,
             alive: self.alive,
             time_of_death: self.time_of_death,
-            driving_direction: self.driving_direction.clone(),
+            user_input: self.user_input.clone(),
             pointing_to: self.pointing_to,
             color: self.color,
             points: self.points,
@@ -95,19 +104,37 @@ impl Player{
     pub fn next_wanted_position(&self, tick_delta: f64) -> (f64, f64) {
         let mut new_x = self.x;
         let mut new_y = self.y;
-        if self.driving_direction.up {
+        if self.user_input.up {
             new_y -= tick_delta * PLAYER_SPEED; // Adjust speed as needed
         }
-        if self.driving_direction.down {
+        if self.user_input.down {
             new_y += tick_delta * PLAYER_SPEED; // Adjust speed as needed
         }
-        if self.driving_direction.left {
+        if self.user_input.left {
             new_x -= tick_delta * PLAYER_SPEED; // Adjust speed as needed
         }
-        if self.driving_direction.right {
+        if self.user_input.right {
             new_x += tick_delta * PLAYER_SPEED; // Adjust speed as needed
         }
         (new_x, new_y)
+    }
+}
+
+pub(crate) struct Direction {
+    pub(crate) up: bool,
+    pub(crate) right: bool,
+    pub(crate) down: bool,
+    pub(crate) left: bool,
+}
+
+impl Clone for Direction {
+    fn clone(&self) -> Self {
+        Direction {
+            up: self.up,
+            right: self.right,
+            down: self.down,
+            left: self.left,
+        }
     }
 }
 
