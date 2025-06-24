@@ -3,7 +3,6 @@ use crate::usr::game::renderer;
 use crate::usr::game::state;
 use alloc::vec::Vec;
 
-
 pub(crate) struct Game {
     game_state: state::GameState,
     renderer: renderer::Renderer,
@@ -31,7 +30,7 @@ impl Game {
             y: 5.0,
             alive: true,
             time_of_death: 0.0,
-            driving_direction: state::Direction{
+            driving_direction: state::Direction {
                 up: false,
                 right: false,
                 down: false,
@@ -54,12 +53,23 @@ impl Game {
         self.game_state.last_tick = current_time;
 
         // update Player positions
-        for player in &self.game_state.players {
+        for player in &mut self.game_state.players {
+            // kprintln!(
+            //     "Player ID: {}, Position: ({}, {}), Directions: ({},{},{},{})",
+            //     player.id,
+            //     player.x,
+            //     player.y,
+            //     player.driving_direction.up,
+            //     player.driving_direction.right,
+            //     player.driving_direction.down,
+            //     player.driving_direction.left
+            // );
             if player.alive {
                 // new wanted position based on movement direction and tick delta
                 let new_pos = player.next_wanted_position(tick_delta);
+                player.x = new_pos.0;
+                player.y = new_pos.1;
                 // get closest position on line from x,y to new_x,new_y without going through walls
-
             }
         }
 
@@ -90,7 +100,9 @@ impl Game {
     }
 
     pub fn set_player_movement(&mut self, player_id: usize, direction: state::Direction) {
-        // TODO overwrite player movement direction
+        if let Some(player) = self.game_state.players.get_mut(player_id) {
+            player.driving_direction = direction;
+        }
     }
 
     pub fn try_shoot(&mut self, player_id: usize) {

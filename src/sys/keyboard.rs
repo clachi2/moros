@@ -13,6 +13,10 @@ pub static KEYBOARD: Mutex<Option<KeyboardLayout>> = Mutex::new(None);
 pub static ALT: AtomicBool = AtomicBool::new(false);
 pub static CTRL: AtomicBool = AtomicBool::new(false);
 pub static SHIFT: AtomicBool = AtomicBool::new(false);
+pub static UP: AtomicBool = AtomicBool::new(false);
+pub static DOWN: AtomicBool = AtomicBool::new(false);
+pub static LEFT: AtomicBool = AtomicBool::new(false);
+pub static RIGHT: AtomicBool = AtomicBool::new(false);
 
 pub enum KeyboardLayout {
     Azerty(Keyboard<layouts::Azerty, ScancodeSet1>),
@@ -113,6 +117,10 @@ fn interrupt_handler() {
                 KeyCode::LControl | KeyCode::RControl => {
                     CTRL.store(event.state == KeyState::Down, ord)
                 }
+                KeyCode::ArrowUp | KeyCode::W => UP.store(event.state == KeyState::Down, ord),
+                KeyCode::ArrowDown | KeyCode::S => DOWN.store(event.state == KeyState::Down, ord),
+                KeyCode::ArrowLeft | KeyCode::A => LEFT.store(event.state == KeyState::Down, ord),
+                KeyCode::ArrowRight | KeyCode::D => RIGHT.store(event.state == KeyState::Down, ord),
                 _ => {}
             }
             let is_alt = ALT.load(ord);

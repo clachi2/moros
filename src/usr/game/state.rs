@@ -1,9 +1,9 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
-pub static PLAYER_SPEED: f64 = 0.1; // Speed of player movement per tick
+pub static PLAYER_SPEED: f64 = 20.0; // Speed of player movement per tick
 pub static PLAYER_SIZE: usize = 8; // Size of the player in pixels
-pub static BULLET_SPEED: f64 = 0.2; // Speed of bullet movement per tick
+pub static BULLET_SPEED: f64 = 20.0; // Speed of bullet movement per tick
 pub static BULLET_SIZE: usize = 4; // Size of the bullet in pixels
 pub static GUI_WIDTH: usize = 80;
 
