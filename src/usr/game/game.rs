@@ -1,7 +1,7 @@
 use crate::sys::clk::boot_time;
 use crate::usr::game::renderer;
 use crate::usr::game::state;
-use crate::usr::game::state::TICK_RATE;
+use crate::usr::game::state::{GUI_WIDTH, TICK_RATE};
 use alloc::vec::Vec;
 
 pub(crate) struct Game {
@@ -11,7 +11,9 @@ pub(crate) struct Game {
 
 impl Game {
     pub fn new(width: usize, height: usize) -> Self {
-        let game_state = state::GameState::new();
+        let mut map = state::Map::new(width, height, 12, 10, 20); // Example dimensions, adjust as needed
+        map.auto_set_walls();
+        let game_state = state::GameState::new(map);
         let renderer = renderer::Renderer::new(width, height, 8, 12, 10, 20);
         Game {
             game_state,
@@ -21,14 +23,15 @@ impl Game {
 
     pub fn init(&mut self) {
         self.renderer.init();
-        self.game_state.map.set_test_map();
         self.renderer.draw_map_buffer(self.game_state.map.clone());
+
+        let pos = self.game_state.map.random_pos();
 
         // tests
         self.game_state.players.push(state::Player {
             id: 0,
-            x: 5.0,
-            y: 5.0,
+            x: pos.0 as f64,
+            y: pos.1 as f64,
             alive: true,
             time_of_death: 0.0,
             user_input: state::UserInput {
@@ -41,11 +44,15 @@ impl Game {
                 map_mouse_y: 0,
             },
             pointing_to: (0, 0),
-            color: 0x0f,
+            color: 0x03, // Magenta
             points: 0,
             ammo: 5,
             last_shot: 0.0,
         });
+    }
+
+    pub fn deinit(&mut self) {
+        self.renderer.deinit();
     }
 
     pub fn tick(&mut self) {
@@ -64,9 +71,11 @@ impl Game {
             if player.alive {
                 // new wanted position based on movement direction and tick delta
                 let new_pos = player.next_wanted_position(tick_delta);
-                player.x = new_pos.0;
-                player.y = new_pos.1;
-                // get closest position on line from x,y to new_x,new_y without going through walls
+                if  !self.game_state.map.is_pos_colliding(new_pos.0 as isize, new_pos.1 as isize) {
+                    // If the new position collides with a wall, do not move
+                    player.x = new_pos.0;
+                    player.y = new_pos.1;
+                }
             }
         }
 
@@ -81,7 +90,7 @@ impl Game {
         for player in &self.game_state.players {
             if player.alive {
                 self.renderer
-                    .draw_player(player.x as usize, player.y as usize, player.color);
+                    .draw_player(player.x as isize + GUI_WIDTH as isize, player.y as isize, player.color);
             }
         }
         // Draw mouse cursor

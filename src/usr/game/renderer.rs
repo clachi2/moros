@@ -52,20 +52,27 @@ impl Renderer {
         self.framebuffer.clear();
     }
 
+    pub fn deinit(&mut self) {
+        write("/dev/vga/mode", b"80x25").expect("Could not switch to graphics mode");
+        VgaPalette::default().write();
+        print!("\x1b[?25h"); // Cursor einblenden
+    }
+
     pub fn flush(&mut self) {
         // flush framebuffer to file
         self.framebuffer.flush();
     }
 
-    pub fn draw_player(&mut self, x: usize, y: usize, color: u8) {
+    pub fn draw_player(&mut self, x: isize, y: isize, color: u8) {
         for dy in 0..PLAYER_SIZE {
             for dx in 0..PLAYER_SIZE {
-                self.map_buffer.draw_pixel(x + dx, y + dy, color);
+                self.framebuffer
+                    .draw_pixel(x + dx as isize, y + dy as isize, color);
             }
         }
     }
 
-    pub fn draw_mouse_cursor(&mut self, x: usize, y: usize) {
+    pub fn draw_mouse_cursor(&mut self, x: isize, y: isize) {
         // Draw a simple crosshair as mouse cursor
         let cursor_color = 0x0f; // White color
         self.framebuffer.draw_line(x - 4, y, x + 4, y, cursor_color);
@@ -88,37 +95,37 @@ impl Renderer {
                 let tile = map.tiles[y * map.tiles_x + x].clone();
                 if tile.up {
                     self.map_buffer.draw_line(
-                        x * self.tile_size,
-                        y * self.tile_size,
-                        (x + 1) * self.tile_size - 1,
-                        y * self.tile_size,
+                        (x * self.tile_size) as isize,
+                        (y * self.tile_size) as isize,
+                        ((x + 1) * self.tile_size - 1) as isize,
+                        (y * self.tile_size) as isize,
                         0x0f, // White color
                     );
                 }
                 if tile.right {
                     self.map_buffer.draw_line(
-                        (x + 1) * self.tile_size - 1,
-                        y * self.tile_size,
-                        (x + 1) * self.tile_size - 1,
-                        (y + 1) * self.tile_size - 1,
+                        ((x + 1) * self.tile_size - 1) as isize,
+                        (y * self.tile_size) as isize,
+                        ((x + 1) * self.tile_size - 1) as isize,
+                        ((y + 1) * self.tile_size - 1) as isize,
                         0x0f, // White color
                     );
                 }
                 if tile.down {
                     self.map_buffer.draw_line(
-                        x * self.tile_size,
-                        (y + 1) * self.tile_size - 1,
-                        (x + 1) * self.tile_size - 1,
-                        (y + 1) * self.tile_size - 1,
+                        (x * self.tile_size) as isize,
+                        ((y + 1) * self.tile_size - 1) as isize,
+                        ((x + 1) * self.tile_size - 1) as isize,
+                        ((y + 1) * self.tile_size - 1) as isize,
                         0x0f, // White color
                     );
                 }
                 if tile.left {
                     self.map_buffer.draw_line(
-                        x * self.tile_size,
-                        y * self.tile_size,
-                        x * self.tile_size,
-                        (y + 1) * self.tile_size - 1,
+                        (x * self.tile_size) as isize,
+                        (y * self.tile_size) as isize,
+                        (x * self.tile_size) as isize,
+                        ((y + 1) * self.tile_size - 1) as isize,
                         0x0f, // White color
                     );
                 }

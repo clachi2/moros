@@ -1,9 +1,9 @@
 use crate::api::font::Font;
 use crate::api::fs::write;
+use crate::kprint;
+use crate::kprintln;
 use alloc::vec;
 use alloc::vec::Vec;
-use crate::kprintln;
-use crate::kprint;
 
 pub struct Framebuffer {
     width: usize,
@@ -69,18 +69,21 @@ impl Framebuffer {
         write(self.file_path, &self.internal_buffer).expect("could not write to framebuffer file");
     }
 
-    pub fn draw_pixel(&mut self, x: usize, y: usize, color: u8) {
-        if x < self.width && y < self.height {
+    pub fn draw_pixel(&mut self, x: isize, y: isize, color: u8) {
+        if x >= 0 && x < self.width as isize && y >= 0 && y < self.height as isize {
+            let x = x as usize;
+            let y = y as usize;
             let index = y * self.pitch + x * (self.color_depth / 8);
-            //let index = y * self.width + x;
             self.internal_buffer[index] = color;
         }
     }
 
-    pub fn draw_line(&mut self, x1: usize, y1: usize, x2: usize, y2: usize, color: u8) {
-
-        if x1 >= self.width || y1 >= self.height || x2 >= self.width || y2 >= self.height {
-            kprintln!("draw_line: coordinates out of bounds");
+    pub fn draw_line(&mut self, x1: isize, y1: isize, x2: isize, y2: isize, color: u8) {
+        if x1 >= self.width as isize
+            || y1 >= self.height as isize
+            || x2 >= self.width as isize
+            || y2 >= self.height as isize
+        {
             return;
         }
 
@@ -101,16 +104,16 @@ impl Framebuffer {
             let err2 = err * 2;
             if err2 > -dy {
                 err -= dy;
-                x = (x as isize + sx) as usize;
+                x = x + sx;
             }
             if err2 < dx {
                 err += dx;
-                y = (y as isize + sy) as usize;
+                y = y + sy;
             }
         }
     }
 
-    pub fn draw_rectangle(&mut self, x: usize, y: usize, width: usize, height: usize, color: u8) {
+    pub fn draw_rectangle(&mut self, x: isize, y: isize, width: isize, height: isize, color: u8) {
         for dy in 0..height {
             for dx in 0..width {
                 self.draw_pixel(x + dx, y + dy, color);
@@ -118,50 +121,26 @@ impl Framebuffer {
         }
     }
 
-    pub fn draw_circle(&mut self, cx: usize, cy: usize, radius: usize, color: u8, filled: bool) {
+    pub fn draw_circle(&mut self, cx: isize, cy: isize, radius: usize, color: u8, filled: bool) {
         let mut x = radius as isize;
         let mut y = 0;
         let mut err = 0;
 
         while x >= y {
             if filled {
-                self.draw_line(
-                    cx - x as usize,
-                    cy + y as usize,
-                    cx + x as usize,
-                    cy + y as usize,
-                    color,
-                );
-                self.draw_line(
-                    cx - x as usize,
-                    cy - y as usize,
-                    cx + x as usize,
-                    cy - y as usize,
-                    color,
-                );
-                self.draw_line(
-                    cx - y as usize,
-                    cy + x as usize,
-                    cx + y as usize,
-                    cy + x as usize,
-                    color,
-                );
-                self.draw_line(
-                    cx - y as usize,
-                    cy - x as usize,
-                    cx + y as usize,
-                    cy - x as usize,
-                    color,
-                );
+                self.draw_line(cx - x, cy + y, cx + x, cy + y, color);
+                self.draw_line(cx - x, cy - y, cx + x, cy - y, color);
+                self.draw_line(cx - y, cy + x, cx + y, cy + x, color);
+                self.draw_line(cx - y, cy - x, cx + y, cy - x, color);
             } else {
-                self.draw_pixel(cx + x as usize, cy + y as usize, color);
-                self.draw_pixel(cx - x as usize, cy + y as usize, color);
-                self.draw_pixel(cx + y as usize, cy + x as usize, color);
-                self.draw_pixel(cx - y as usize, cy + x as usize, color);
-                self.draw_pixel(cx + x as usize, cy - y as usize, color);
-                self.draw_pixel(cx - x as usize, cy - y as usize, color);
-                self.draw_pixel(cx + y as usize, cy - x as usize, color);
-                self.draw_pixel(cx - y as usize, cy - x as usize, color);
+                self.draw_pixel(cx + x, cy + y, color);
+                self.draw_pixel(cx - x, cy + y, color);
+                self.draw_pixel(cx + y, cy + x, color);
+                self.draw_pixel(cx - y, cy + x, color);
+                self.draw_pixel(cx + x, cy - y, color);
+                self.draw_pixel(cx - x, cy - y, color);
+                self.draw_pixel(cx + y, cy - x, color);
+                self.draw_pixel(cx - y, cy - x, color);
             }
 
             if err <= 0 {
@@ -177,8 +156,8 @@ impl Framebuffer {
 
     pub fn draw_text(
         &mut self,
-        x: usize,
-        y: usize,
+        x: isize,
+        y: isize,
         text: &str,
         color: u8,
         font: &Font,
@@ -197,8 +176,8 @@ impl Framebuffer {
                 let row = font.data[offset + dy];
                 for dx in 0..8 {
                     if (row >> (7 - dx)) & 1 == 1 {
-                        let pixel_x = (cursor_x + dx as f32 * scale) as usize;
-                        let pixel_y = (y as f32 + dy as f32 * scale) as usize;
+                        let pixel_x = (cursor_x + dx as f32 * scale) as isize;
+                        let pixel_y = (y as f32 + dy as f32 * scale) as isize;
 
                         self.draw_pixel(pixel_x, pixel_y, color);
                     }
@@ -211,8 +190,8 @@ impl Framebuffer {
 
     pub fn draw_bitmap(
         &mut self,
-        x: usize,
-        y: usize,
+        x: isize,
+        y: isize,
         bitmap: &[bool],
         width: usize,
         height: usize,
@@ -222,9 +201,9 @@ impl Framebuffer {
         for dy in 0..height {
             for dx in 0..width {
                 if bitmap[dy * width + dx] {
-                    self.draw_pixel(x + dx, y + dy, fg);
+                    self.draw_pixel(x + dx as isize, y + dy as isize, fg);
                 } else {
-                    self.draw_pixel(x + dx, y + dy, bg);
+                    self.draw_pixel(x + dx as isize, y + dy as isize, bg);
                 }
             }
         }
