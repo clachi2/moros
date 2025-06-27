@@ -3,6 +3,7 @@ use crate::usr::game::renderer;
 use crate::usr::game::state;
 use crate::usr::game::state::{GUI_WIDTH, TICK_RATE};
 use alloc::vec::Vec;
+use crate::usr::game::renderer::Color;
 
 pub(crate) struct Game {
     game_state: state::GameState,
@@ -44,7 +45,7 @@ impl Game {
                 map_mouse_y: 0,
             },
             pointing_to: (0, 0),
-            color: 0x03, // Magenta
+            color: Color::Blue as u8,
             points: 0,
             ammo: 5,
             last_shot: 0.0,
@@ -75,6 +76,17 @@ impl Game {
                     // If the new position collides with a wall, do not move
                     player.x = new_pos.0;
                     player.y = new_pos.1;
+                }
+                else if !self.game_state.map.is_pos_colliding(player.x as isize, new_pos.1 as isize) {
+                    // only move vertically if horizontal movement is blocked
+                    player.y = new_pos.1;
+                }
+                else if !self.game_state.map.is_pos_colliding(new_pos.0 as isize, player.y as isize) {
+                    // only move horizontally if vertical movement is blocked
+                    player.x = new_pos.0;
+                }
+                else {
+                    // check of each pixel of line between old and new position if it collides with a wall
                 }
             }
         }
