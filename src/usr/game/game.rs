@@ -1,27 +1,56 @@
 use crate::sys::clk::boot_time;
+use crate::usr::game::network::{MessageType, NetworkHandler};
 use crate::usr::game::renderer;
 use crate::usr::game::state;
-use crate::usr::game::state::{GUI_WIDTH, TICK_RATE};
+use crate::usr::game::state::{GUI_WIDTH, Serializable, TICK_RATE};
 use alloc::vec::Vec;
+use libm::y0;
 
 pub(crate) struct Game {
     game_state: state::GameState,
     renderer: renderer::Renderer,
+    network_handler: NetworkHandler,
 }
 
 impl Game {
     pub fn new(width: usize, height: usize) -> Self {
         let mut map = state::Map::new(width, height, 12, 10, 20); // Example dimensions, adjust as needed
-        map.auto_set_walls();
+        //map.auto_set_walls();
         let game_state = state::GameState::new(map);
         let renderer = renderer::Renderer::new(width, height, 8, 12, 10, 20);
+        let network_handler = NetworkHandler::new();
         Game {
             game_state,
             renderer,
+            network_handler,
         }
     }
 
-    pub fn init(&mut self) {
+    pub fn init(&mut self, is_server: bool) {
+        self.network_handler
+            .init(is_server, None)
+            .expect("Failed to initialize network handler");
+        if is_server {
+            self.network_handler.set_server();
+            self.game_state.map.auto_set_walls();
+            // Set the map in network handler so it can be sent to clients
+            self.network_handler.set_map(self.game_state.map.clone());
+            kprintln!("Server: Map generated and ready");
+        } else {
+            kprintln!("Client: Waiting for map from server...");
+            // Wait for map from server
+            loop {
+                // Max 100 attempts
+                self.network_handler.send_message_type(MessageType::MapRequest, &[]).expect("TODO: panic message");
+                if let Some(received_map) = self.network_handler.get_received_map() {
+                    self.game_state.map = received_map;
+                    kprintln!("Client: Map received from server!");
+                    break;
+                }
+                crate::sys::clk::halt(); // Small delay
+            }
+        }
+
         self.renderer.init();
         self.renderer.draw_map_buffer(self.game_state.map.clone());
 
@@ -56,7 +85,8 @@ impl Game {
     }
 
     pub fn tick(&mut self) {
-        // TODO update game state, handle input, etc.
+        // Handle network messages
+        self.handle_network_messages();
 
         // Tick timing
         let current_time = boot_time();
@@ -71,7 +101,11 @@ impl Game {
             if player.alive {
                 // new wanted position based on movement direction and tick delta
                 let new_pos = player.next_wanted_position(tick_delta);
-                if  !self.game_state.map.is_pos_colliding(new_pos.0 as isize, new_pos.1 as isize) {
+                if !self
+                    .game_state
+                    .map
+                    .is_pos_colliding(new_pos.0 as isize, new_pos.1 as isize)
+                {
                     // If the new position collides with a wall, do not move
                     player.x = new_pos.0;
                     player.y = new_pos.1;
@@ -89,8 +123,11 @@ impl Game {
         self.renderer.draw_map();
         for player in &self.game_state.players {
             if player.alive {
-                self.renderer
-                    .draw_player(player.x as isize + GUI_WIDTH as isize, player.y as isize, player.color);
+                self.renderer.draw_player(
+                    player.x as isize + GUI_WIDTH as isize,
+                    player.y as isize,
+                    player.color,
+                );
             }
         }
         // Draw mouse cursor
@@ -141,5 +178,36 @@ impl Game {
 
     pub fn deserialize_map(&mut self, data: &[u8]) {
         // TODO deserialize map data from bytes received over the network
+    }
+
+    fn handle_network_messages(&mut self) {
+        if let Ok(messages) = self.network_handler.poll_messages() {
+            for (msg_type, data, sender) in messages {
+                match msg_type {
+                    crate::usr::game::network::MessageType::MapData => {
+                        if !data.is_empty() {
+                            let received_map = crate::usr::game::state::Map::deserialize(&data);
+                            self.set_and_draw_map(received_map);
+                            kprintln!("Client: Map updated from server");
+                        }
+                    }
+                    crate::usr::game::network::MessageType::Connect => {
+                        kprintln!("New client connected: {:?}", sender);
+                        //TODO: neuen spieler erstellen und zum Spiel hinzufügen
+                    }
+                    _ => {
+                        // Handle other message types as needed
+                        kprintln!(
+                            "Received message of type {:?} from {:?}: {:?}",
+                            msg_type, sender, data
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn get_network_handler(&mut self) -> &mut NetworkHandler {
+        &mut self.network_handler
     }
 }

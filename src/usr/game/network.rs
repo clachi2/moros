@@ -1,15 +1,19 @@
 use crate::api::fs;
+use crate::api::fs::{FileIO, IO};
+use crate::kprintln;
+use crate::sys::net::socket::SOCKETS;
 use crate::sys::net::socket::udp::UdpSocket;
+use crate::usr::game::state::{Map, Serializable};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::net::Ipv4Addr;
 use core::str::FromStr;
 use nolock::queues::mpmc;
 use nolock::queues::mpmc::bounded::scq::{Receiver, Sender};
+use smoltcp::socket::udp;
 use smoltcp::socket::udp::UdpMetadata;
 use smoltcp::wire::{IpAddress, IpCidr};
-use spin::{Once};
-use crate::api::fs::{FileIO};
+use spin::Once;
 
 const BUFFER_SIZE: usize = 1024;
 
@@ -24,21 +28,54 @@ fn get_receiving_buffer() -> &'static MessageQueue {
     RECEIVING_BUFFER.call_once(|| MessageQueue::new())
 }
 
+#[derive(Debug, Clone)]
+pub enum MessageType {
+    Connect,
+    MapRequest,
+    MapData,
+    PlayerInput,
+    GameState,
+}
+
+impl MessageType {
+    pub fn to_u8(&self) -> u8 {
+        match self {
+            MessageType::Connect => 0,
+            MessageType::MapRequest => 1,
+            MessageType::MapData => 2,
+            MessageType::PlayerInput => 3,
+            MessageType::GameState => 4,
+        }
+    }
+
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(MessageType::Connect),
+            1 => Some(MessageType::MapRequest),
+            2 => Some(MessageType::MapData),
+            3 => Some(MessageType::PlayerInput),
+            4 => Some(MessageType::GameState),
+            _ => None,
+        }
+    }
+}
+
 pub struct NetworkHandler {
     socket: UdpSocket,
     buffer: [u8; 1024],
     is_server: bool,
-    remotes : Vec<UdpMetadata>,
+    connected_clients: Vec<UdpMetadata>,
+    current_map: Option<Map>,
 }
 
 impl NetworkHandler {
-
     pub fn new() -> Self {
         NetworkHandler {
             socket: UdpSocket::new(),
             buffer: [0; 1024],
             is_server: false,
-            remotes: Vec::new(),
+            connected_clients: Vec::new(),
+            current_map: None,
         }
     }
 
@@ -49,16 +86,24 @@ impl NetworkHandler {
             if self.socket.listen(1234).is_err() {
                 panic!("Failed to set up server socket");
             }
-
-        }
-        else {
-            if self.socket.connect(IpAddress::from(Ipv4Addr::new(192, 168, 0, 1)), 1234).is_err() {
+        } else {
+            self.set_ip("192.168.0.2").expect("");
+            if self
+                .socket
+                .connect(IpAddress::from(Ipv4Addr::new(192, 168, 0, 1)), 1234)
+                .is_err()
+            {
                 return Err("Failed to connect to server".to_string());
+            } else {
+                kprintln!("Connected to server");
+                // Send connection request
+                self.send_message_type(MessageType::Connect, &[])?;
+                // Request map from server
+                self.send_message_type(MessageType::MapRequest, &[])?;
             }
         }
 
         Ok(())
-
     }
 
     pub fn set_server(&mut self) {
@@ -73,6 +118,7 @@ impl NetworkHandler {
             {
                 Err("Failed to set IP address".to_string())
             } else {
+                kprintln!("IP address set to {}", ip);
                 Ok(())
             };
         }
@@ -120,12 +166,127 @@ impl NetworkHandler {
     }
 
     pub fn send_message(&mut self, message: &str) -> Result<(), String> {
-
+        if self.socket.poll(IO::Write) {
+            if self.socket.write(message.as_bytes()).is_err() {
+                return Err("Failed to send message".to_string());
+            }
+        }
         Ok(())
     }
 
+    pub fn send_message_type(&mut self, msg_type: MessageType, data: &[u8]) -> Result<(), String> {
+        let mut message = Vec::new();
+        message.push(msg_type.to_u8());
+        message.extend_from_slice(data);
 
+        if self.socket.poll(IO::Write) {
+            if self.socket.write(&message).is_err() {
+                return Err("Failed to send typed message".to_string());
+            }
+        }
+        Ok(())
+    }
 
+    pub fn send_map(&mut self, map: &Map) -> Result<(), String> {
+        let map_data = map.serialize();
+        self.send_message_type(MessageType::MapData, &map_data)
+    }
+
+    pub fn poll_messages(&mut self) -> Result<Vec<(MessageType, Vec<u8>, UdpMetadata)>, String> {
+        let mut messages = Vec::new();
+
+        while self.socket.poll(IO::Read) {
+            if let Ok((size, remote_endpoint)) = {
+                let mut sockets = SOCKETS.lock();
+                let socket = sockets.get_mut::<udp::Socket>(self.socket.handle);
+                socket.recv_slice(&mut self.buffer).map_err(|_| ())
+            } {
+                if size > 0 {
+                    if let Some(msg_type) = MessageType::from_u8(self.buffer[0]) {
+                        let data = self.buffer[1..size].to_vec();
+                        kprintln!(
+                            "Received message of type {:?} from {:?}: {:?}",
+                            msg_type,
+                            remote_endpoint,
+                            core::str::from_utf8(&data).unwrap_or("Invalid UTF-8")
+                        );
+
+                        if self.is_server {
+                            self.handle_server_message(msg_type.clone(), &data, remote_endpoint)?;
+                        }
+
+                        messages.push((msg_type, data, remote_endpoint));
+                    }
+                }
+            }
+        }
+
+        Ok(messages)
+    }
+
+    fn handle_server_message(
+        &mut self,
+        msg_type: MessageType,
+        data: &[u8],
+        client: UdpMetadata,
+    ) -> Result<(), String> {
+        match msg_type {
+            MessageType::Connect => {
+                // Add client if not already connected
+                if !self
+                    .connected_clients
+                    .iter()
+                    .any(|c| c.endpoint == client.endpoint)
+                {
+                    self.connected_clients.push(client);
+                    kprintln!("push New client connected: {:?}", client.endpoint);
+                }
+            }
+            MessageType::MapRequest => {
+                // Send map to requesting client
+                kprintln!("Client {:?} requested map data", client.endpoint);
+                if let Some(ref map) = self.current_map {
+                    let map_data = map.serialize();
+                    self.send_map_to_client(&map_data, client)?;
+                }
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn send_map_to_client(&mut self, map_data: &[u8], client: UdpMetadata) -> Result<(), String> {
+        let mut message = Vec::new();
+        message.push(MessageType::MapData.to_u8());
+        message.extend_from_slice(map_data);
+
+        if self.socket.poll(IO::Write) {
+            let mut sockets = SOCKETS.lock();
+            let socket = sockets.get_mut::<udp::Socket>(self.socket.handle);
+            if socket.send_slice(&message, client).is_err() {
+                return Err("Failed to send map to client".to_string());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn set_map(&mut self, map: Map) {
+        self.current_map = Some(map);
+    }
+
+    pub fn get_received_map(&mut self) -> Option<Map> {
+        // Poll for messages and check for map data
+        if let Ok(messages) = self.poll_messages() {
+            for (msg_type, data, _) in messages {
+                if let MessageType::MapData = msg_type {
+                    if !data.is_empty() {
+                        return Some(Map::deserialize(&data));
+                    }
+                }
+            }
+        }
+        None
+    }
 }
 
 pub struct Message {
@@ -150,7 +311,6 @@ impl MessageQueue {
         }
         if let Err(_) = self.sender.try_enqueue(message) {
             panic!("MessageQueue is full!");
-
         }
     }
 

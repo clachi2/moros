@@ -1,5 +1,6 @@
 use crate::api::console::Style;
 use crate::api::process::ExitCode;
+use crate::kprintln;
 use crate::sys;
 use crate::sys::console;
 use crate::sys::keyboard::{DOWN, LEFT, RIGHT, UP};
@@ -17,11 +18,16 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         return help();
     }
     let is_server = args.iter().any(|&arg| arg == "-s" || arg == "--server");
+    //TODO Use this ip later for now client get 0.2
     let ip = args.iter().find(|&&arg| arg.starts_with("-ip="));
 
     let mut game = crate::usr::game::game::Game::new(WIDTH, HEIGHT);
-    game.init();
-    kprintln!("Starting game...");
+    game.init(is_server);
+    if is_server {
+        kprintln!("Starting game server...");
+    } else {
+        kprintln!("Starting game client...");
+    }
 
     let mut mouse_x: i32 = 0;
     let mut mouse_y: i32 = 0;
@@ -42,11 +48,12 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                         game.deinit();
                         return Ok(());
                     }
-                    'y' => { // TODO remove this, just for testing
+                    'y' => {
+                        // TODO remove this, just for testing
                         let mut map = Map::new(320, 200, 12, 10, 20);
                         map.auto_set_walls();
                         game.set_and_draw_map(map);
-                    },
+                    }
                     _ => {}
                 }
             }

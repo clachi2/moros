@@ -1,3 +1,4 @@
+use crate::kprintln;
 use crate::sys::rng::get_u64;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -13,7 +14,7 @@ pub static WALL_DENSITY: f32 = 0.8; // Density of walls in the map
 pub(crate) trait Serializable {
     fn serialize(&self) -> Vec<u8>;
     fn deserialize(data: &[u8]) -> Self;
-} // TODO für alle structs implementieren
+}
 
 pub(crate) struct GameState {
     pub(crate) map: Map,
@@ -119,6 +120,43 @@ impl Clone for Direction {
     }
 }
 
+impl Serializable for Direction {
+    fn serialize(&self) -> Vec<u8> {
+        let mut result = 0u8;
+        if self.up {
+            result |= 0b0001;
+        }
+        if self.right {
+            result |= 0b0010;
+        }
+        if self.down {
+            result |= 0b0100;
+        }
+        if self.left {
+            result |= 0b1000;
+        }
+        vec![result]
+    }
+
+    fn deserialize(data: &[u8]) -> Self {
+        if data.is_empty() {
+            return Direction {
+                up: false,
+                right: false,
+                down: false,
+                left: false,
+            };
+        }
+        let byte = data[0];
+        Direction {
+            up: (byte & 0b0001) != 0,
+            right: (byte & 0b0010) != 0,
+            down: (byte & 0b0100) != 0,
+            left: (byte & 0b1000) != 0,
+        }
+    }
+}
+
 pub(crate) struct Bullet {
     pub(crate) x: f64, // TODO vll als float, damit ticks funktionieren?
     pub(crate) y: f64,
@@ -146,6 +184,58 @@ impl Clone for Map {
             tiles_y: self.tiles_y,
             tile_size: self.tile_size,
             tiles: self.tiles.clone(),
+        }
+    }
+}
+
+impl Serializable for Map {
+    fn serialize(&self) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        // Serialize map dimensions (4 bytes each)
+        result.extend_from_slice(&(self.size_x as u32).to_le_bytes());
+        result.extend_from_slice(&(self.size_y as u32).to_le_bytes());
+        result.extend_from_slice(&(self.tiles_x as u32).to_le_bytes());
+        result.extend_from_slice(&(self.tiles_y as u32).to_le_bytes());
+        result.extend_from_slice(&(self.tile_size as u32).to_le_bytes());
+
+        // Serialize tiles
+        for tile in &self.tiles {
+            result.extend(tile.serialize());
+        }
+
+        result
+    }
+
+    fn deserialize(data: &[u8]) -> Self {
+        if data.len() < 20 {
+            panic!("Invalid map data: too short");
+        }
+
+        let size_x = u32::from_le_bytes([data[0], data[1], data[2], data[3]]) as usize;
+        let size_y = u32::from_le_bytes([data[4], data[5], data[6], data[7]]) as usize;
+        let tiles_x = u32::from_le_bytes([data[8], data[9], data[10], data[11]]) as usize;
+        let tiles_y = u32::from_le_bytes([data[12], data[13], data[14], data[15]]) as usize;
+        let tile_size = u32::from_le_bytes([data[16], data[17], data[18], data[19]]) as usize;
+
+        let expected_tiles = tiles_x * tiles_y;
+        if data.len() < 20 + expected_tiles {
+            panic!("Invalid map data: not enough tile data");
+        }
+
+        let mut tiles = Vec::new();
+        for i in 0..expected_tiles {
+            let tile_data = &data[20 + i..20 + i + 1];
+            tiles.push(Direction::deserialize(tile_data));
+        }
+
+        Map {
+            size_x,
+            size_y,
+            tiles_x,
+            tiles_y,
+            tile_size,
+            tiles,
         }
     }
 }
