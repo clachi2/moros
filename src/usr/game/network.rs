@@ -97,9 +97,8 @@ impl NetworkHandler {
             } else {
                 kprintln!("Connected to server");
                 // Send connection request
+                // TODO: Gerde gehen wir davon aus das server schon existiert.. evlt. problem
                 self.send_message_type(MessageType::Connect, &[])?;
-                // Request map from server
-                self.send_message_type(MessageType::MapRequest, &[])?;
             }
         }
 

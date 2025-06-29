@@ -1,9 +1,12 @@
 use crate::sys::clk::boot_time;
+use crate::usr::game::network::{MessageType, NetworkHandler};
 use crate::usr::game::renderer;
 use crate::usr::game::state;
-use crate::usr::game::state::{GUI_WIDTH, Serializable, TICK_RATE};
+use crate::usr::game::state::{GUI_WIDTH, TICK_RATE};
 use alloc::vec::Vec;
-use libm::y0;
+use core::hash::Hash;
+use crate::api::fs;
+use crate::api::fs::DeviceType::Random;
 use crate::usr::game::renderer::Color;
 
 pub(crate) struct Game {
@@ -40,7 +43,7 @@ impl Game {
             kprintln!("Client: Waiting for map from server...");
             // Wait for map from server
             loop {
-                // Max 100 attempts
+                // Client is stuck here until it receives the map
                 self.network_handler.send_message_type(MessageType::MapRequest, &[]).expect("TODO: panic message");
                 if let Some(received_map) = self.network_handler.get_received_map() {
                     self.game_state.map = received_map;
@@ -54,30 +57,30 @@ impl Game {
         self.renderer.init();
         self.renderer.draw_map_buffer(self.game_state.map.clone());
 
-        let pos = self.game_state.map.random_pos();
-
-        // tests
-        self.game_state.players.push(state::Player {
-            id: 0,
-            x: pos.0 as f64,
-            y: pos.1 as f64,
-            alive: true,
-            time_of_death: 0.0,
-            user_input: state::UserInput {
-                up: false,
-                right: false,
-                down: false,
-                left: false,
-                shooting: false,
-                map_mouse_x: 0,
-                map_mouse_y: 0,
-            },
-            pointing_to: (0, 0),
-            color: Color::Blue as u8,
-            points: 0,
-            ammo: 5,
-            last_shot: 0.0,
-        });
+        // let pos = self.game_state.map.random_pos();
+        //
+        // // tests
+        // self.game_state.players.push(state::Player {
+        //     id: 0,
+        //     x: pos.0 as f64,
+        //     y: pos.1 as f64,
+        //     alive: true,
+        //     time_of_death: 0.0,
+        //     user_input: state::UserInput {
+        //         up: false,
+        //         right: false,
+        //         down: false,
+        //         left: false,
+        //         shooting: false,
+        //         map_mouse_x: 0,
+        //         map_mouse_y: 0,
+        //     },
+        //     pointing_to: (0, 0),
+        //     color: Color::Blue as u8,
+        //     points: 0,
+        //     ammo: 5,
+        //     last_shot: 0.0,
+        // });
     }
 
     pub fn deinit(&mut self) {
@@ -135,9 +138,10 @@ impl Game {
             }
         }
         // Draw mouse cursor
-        let mouse_x = self.game_state.players[0].user_input.map_mouse_x; // TODO get index from somewhere else
-        let mouse_y = self.game_state.players[0].user_input.map_mouse_y;
-        self.renderer.draw_mouse_cursor(mouse_x, mouse_y);
+        //TODO
+        //let mouse_x = self.game_state.players[0].user_input.map_mouse_x; // TODO get index from somewhere else
+        //let mouse_y = self.game_state.players[0].user_input.map_mouse_y;
+        //self.renderer.draw_mouse_cursor(mouse_x, mouse_y);
 
         self.renderer.flush();
     }
@@ -182,5 +186,75 @@ impl Game {
 
     pub fn deserialize_map(&mut self, data: &[u8]) {
         // TODO deserialize map data from bytes received over the network
+    }
+
+    fn handle_network_messages(&mut self) {
+        if let Ok(messages) = self.network_handler.poll_messages() {
+            for (msg_type, data, sender) in messages {
+                match msg_type {
+                    // crate::usr::game::network::MessageType::MapData => {
+                    //     if !data.is_empty() {
+                    //         let received_map = crate::usr::game::state::Map::deserialize(&data);
+                    //         self.set_and_draw_map(received_map);
+                    //         kprintln!("Client: Map updated from server");
+                    //     }
+                    // }
+                    crate::usr::game::network::MessageType::Connect => {
+                        kprintln!("New client connected: {:?}", sender);
+                        //TODO: neuen spieler erstellen und zum Spiel hinzufügen
+                        let pos = self.game_state.map.random_pos();
+                        let player_id = match sender.endpoint.addr {
+                            smoltcp::wire::IpAddress::Ipv4(ipv4) => {
+                                let octets = ipv4.octets()[3];
+                                octets
+                            },
+
+                            _ => 0
+                        };
+
+                        for player in &self.game_state.players {
+                            if player.id == player_id as usize {
+                                kprintln!("Player with ID {} already exists, not adding again", player_id);
+                                return; // Player already exists, do not add again
+                            }
+                        }
+
+                        let new_player = state::Player {
+                            id: player_id as usize,
+                            x: pos.0 as f64,
+                            y: pos.1 as f64,
+                            alive: true,
+                            time_of_death: 0.0,
+                            user_input: state::UserInput {
+                                up: false,
+                                right: false,
+                                down: false,
+                                left: false,
+                                shooting: false,
+                                map_mouse_x: 0,
+                                map_mouse_y: 0,
+                            },
+                            pointing_to: (0, 0),
+                            color: Color::Green as u8, // TODO RANDOM
+                            points: 0,
+                            ammo: 5,
+                            last_shot: 0.0,
+                        };
+                        self.game_state.players.push(new_player);
+                    }
+                    _ => {
+                        // Handle other message types as needed
+                        kprintln!(
+                            "Received message of type {:?} from {:?}: {:?}",
+                            msg_type, sender, data
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn get_network_handler(&mut self) -> &mut NetworkHandler {
+        &mut self.network_handler
     }
 }
