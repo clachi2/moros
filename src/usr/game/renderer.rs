@@ -2,6 +2,25 @@ use crate::api::fs::write;
 use crate::sys::vga::{VgaPalette, framebuffer};
 use crate::usr::game::state::{GUI_WIDTH, Map, PLAYER_SIZE};
 
+pub(crate) enum Color {
+    Black = 0x00,
+    Blue = 0x01,
+    Green = 0x02,
+    Cyan = 0x03,
+    Red = 0x04,
+    Magenta = 0x05,
+    Brown = 0x06,
+    LightGray = 0x07,
+    DarkGray = 0x08,
+    LightBlue = 0x09,
+    LightGreen = 0x0A,
+    LightCyan = 0x0B,
+    LightRed = 0x0C,
+    LightMagenta = 0x0D,
+    Yellow = 0x0E,
+    White = 0x0F,
+}
+
 pub(crate) struct Renderer {
     screen_width: usize,
     screen_height: usize,
@@ -74,7 +93,7 @@ impl Renderer {
 
     pub fn draw_mouse_cursor(&mut self, x: isize, y: isize) {
         // Draw a simple crosshair as mouse cursor
-        let cursor_color = 0x0f; // White color
+        let cursor_color = Color::Red as u8; // White color
         self.framebuffer.draw_line(x - 4, y, x + 4, y, cursor_color);
         self.framebuffer.draw_line(x, y - 4, x, y + 4, cursor_color);
     }
@@ -90,44 +109,31 @@ impl Renderer {
         self.map_buffer.clear();
 
         // Draw the map tiles
-        for y in 0..map.tiles_y {
-            for x in 0..map.tiles_x {
+        for y in 0..map.tiles_y as usize {
+            for x in 0..map.tiles_x as usize {
                 let tile = map.tiles[y * map.tiles_x + x].clone();
+                let mut line = (0, 0, 0, 0);
+                let x_i = x as isize;
+                let y_i = y as isize;
                 if tile.up {
-                    self.map_buffer.draw_line(
-                        (x * self.tile_size) as isize,
-                        (y * self.tile_size) as isize,
-                        ((x + 1) * self.tile_size - 1) as isize,
-                        (y * self.tile_size) as isize,
-                        0x0f, // White color
-                    );
+                    line = map.wall_coords(x_i, y_i, 0);
+                    self.map_buffer
+                        .draw_line(line.0, line.1, line.2, line.3, Color::White as u8);
                 }
                 if tile.right {
-                    self.map_buffer.draw_line(
-                        ((x + 1) * self.tile_size - 1) as isize,
-                        (y * self.tile_size) as isize,
-                        ((x + 1) * self.tile_size - 1) as isize,
-                        ((y + 1) * self.tile_size - 1) as isize,
-                        0x0f, // White color
-                    );
+                    line = map.wall_coords(x_i, y_i, 1);
+                    self.map_buffer
+                        .draw_line(line.0, line.1, line.2, line.3, Color::White as u8);
                 }
                 if tile.down {
-                    self.map_buffer.draw_line(
-                        (x * self.tile_size) as isize,
-                        ((y + 1) * self.tile_size - 1) as isize,
-                        ((x + 1) * self.tile_size - 1) as isize,
-                        ((y + 1) * self.tile_size - 1) as isize,
-                        0x0f, // White color
-                    );
+                    line = map.wall_coords(x_i, y_i, 2);
+                    self.map_buffer
+                        .draw_line(line.0, line.1, line.2, line.3, Color::White as u8);
                 }
                 if tile.left {
-                    self.map_buffer.draw_line(
-                        (x * self.tile_size) as isize,
-                        (y * self.tile_size) as isize,
-                        (x * self.tile_size) as isize,
-                        ((y + 1) * self.tile_size - 1) as isize,
-                        0x0f, // White color
-                    );
+                    line = map.wall_coords(x_i, y_i, 3);
+                    self.map_buffer
+                        .draw_line(line.0, line.1, line.2, line.3, Color::White as u8);
                 }
             }
         }

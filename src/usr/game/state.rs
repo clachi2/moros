@@ -52,7 +52,7 @@ impl Clone for UserInput {
 
 pub(crate) struct Player {
     pub(crate) id: usize,
-    pub(crate) x: f64, // TODO vll als float, damit ticks funktionieren?
+    pub(crate) x: f64,
     pub(crate) y: f64,
     pub(crate) alive: bool,
     pub(crate) time_of_death: f64, // Timestamp of death (get using time::epoch_time())
@@ -158,12 +158,14 @@ impl Serializable for Direction {
 }
 
 pub(crate) struct Bullet {
-    pub(crate) x: f64, // TODO vll als float, damit ticks funktionieren?
+    pub(crate) x: f64,
     pub(crate) y: f64,
     pub(crate) direction: Direction,
     pub(crate) started_at_x: f64,
     pub(crate) started_at_y: f64,
     pub(crate) travel_distance: usize,
+    // TODO direkt pfad komplett ausrechnen und speichern?
+    // -> dann immer delta auf dem phad weiter gehen (float)
 }
 
 pub(crate) struct Map {
@@ -267,6 +269,31 @@ impl Map {
         }
     }
 
+    pub fn wall_coords(&self, x: isize, y: isize, facing: isize) -> (isize, isize, isize, isize) {
+        // facing: 0 = up, 1 = right, 2 = down, 3 = left
+        let tx = self.tiles_x as isize;
+        let ty = self.tiles_y as isize;
+        let ts = self.tile_size as isize;
+        if x >= tx || y >= ty {
+            panic!("Tile coordinates out of bounds");
+        }
+        match facing {
+            0 => {
+                (x * ts, y * ts, (x + 1) * ts - 1, y * ts) // up
+            }
+            1 => {
+                ((x + 1) * ts - 1, y * ts, (x + 1) * ts - 1, (y + 1) * ts - 1) // right
+            }
+            2 => {
+                (x * ts, (y + 1) * ts - 1, (x + 1) * ts - 1, (y + 1) * ts - 1) // down
+            }
+            3 => {
+                (x * ts, y * ts, x * ts, (y + 1) * ts - 1) // left
+            }
+            _ => panic!("Invalid facing direction"),
+        }
+    }
+
     pub fn random_pos(&self) -> (usize, usize) {
         let tile_x = get_u64() as usize % self.tiles_x;
         let tile_y = get_u64() as usize % self.tiles_y;
@@ -277,60 +304,44 @@ impl Map {
 
     pub fn is_pos_colliding(&self, x: isize, y: isize) -> bool {
         // Convert position to tile coordinates
-        let tile_x = (x / self.tile_size as isize).max(0) as usize;
-        let tile_y = (y / self.tile_size as isize).max(0) as usize;
+        let tile_x = (x / self.tile_size as isize).max(0);
+        let tile_y = (y / self.tile_size as isize).max(0);
 
         let min_x = tile_x.saturating_sub(1);
-        let max_x = (tile_x + 1).min(self.tiles_x - 1);
+        let max_x = (tile_x + 1).min(self.tiles_x as isize - 1);
         let min_y = tile_y.saturating_sub(1);
-        let max_y = (tile_y + 1).min(self.tiles_y - 1);
+        let max_y = (tile_y + 1).min(self.tiles_y as isize - 1);
 
         // Collect all walls from surrounding tiles
         let mut walls = Vec::new();
         for y in min_y..=max_y {
             for x in min_x..=max_x {
-                let index = y * self.tiles_x + x;
-                let tile = &self.tiles[index];
+                let index = y * self.tiles_x as isize + x;
+                if index < 0 || index as usize >= self.tiles.len() {
+                    continue; // Skip out of bounds indices
+                }
+                let tile = &self.tiles[index as usize];
 
-                // Top wall
                 if tile.up {
-                    let x1 = x * self.tile_size;
-                    let y1 = y * self.tile_size;
-                    let x2 = (x + 1) * self.tile_size;
-                    walls.push((x1 as isize, y1 as isize, x2 as isize, y1 as isize));
+                    walls.push(self.wall_coords(x, y, 0))
                 }
-
-                // Right wall
                 if tile.right {
-                    let x1 = (x + 1) * self.tile_size;
-                    let y1 = y * self.tile_size;
-                    let y2 = (y + 1) * self.tile_size;
-                    walls.push((x1 as isize, y1 as isize, x1 as isize, y2 as isize));
+                    walls.push(self.wall_coords(x, y, 1));
                 }
-
-                // Bottom wall
                 if tile.down {
-                    let x1 = x * self.tile_size;
-                    let y1 = (y + 1) * self.tile_size;
-                    let x2 = (x + 1) * self.tile_size;
-                    walls.push((x1 as isize, y1 as isize, x2 as isize, y1 as isize));
+                    walls.push(self.wall_coords(x, y, 2));
                 }
-
-                // Left wall
                 if tile.left {
-                    let x1 = x * self.tile_size;
-                    let y1 = y * self.tile_size;
-                    let y2 = (y + 1) * self.tile_size;
-                    walls.push((x1 as isize, y1 as isize, x1 as isize, y2 as isize));
+                    walls.push(self.wall_coords(x, y, 3));
                 }
             }
         }
 
         // Player's collision lines
         let l = x;
-        let r = x + PLAYER_SIZE as isize;
+        let r = x + PLAYER_SIZE as isize - 1;
         let t = y;
-        let b = y + PLAYER_SIZE as isize;
+        let b = y + PLAYER_SIZE as isize - 1;
 
         // Check collision with each wall
         for &(wx1, wy1, wx2, wy2) in &walls {
