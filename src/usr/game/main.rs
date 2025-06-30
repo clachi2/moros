@@ -36,7 +36,16 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     loop {
         // parse input to game
         let user_input = get_user_input(&mut mouse_x, &mut mouse_y);
+        //TODO AUF ID setzen
         game.set_user_input(0, user_input);
+
+        // If client, send user input to server
+        if !is_server {
+            //TODO auf id setzen
+            if let Err(e) = game.send_user_input_to_server(0) {
+                kprintln!("Failed to send user input to server: {}", e);
+            }
+        }
 
         console::disable_echo();
         console::enable_raw();
@@ -62,6 +71,14 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         console::disable_raw();
 
         game.tick();
+
+        // If server, broadcast game state to all clients
+        if is_server {
+            if let Err(e) = game.broadcast_game_state_to_clients() {
+                kprintln!("Failed to broadcast game state: {}", e);
+            }
+        }
+
         game.draw();
         sys::clk::halt();
     }

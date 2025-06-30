@@ -35,6 +35,7 @@ pub enum MessageType {
     MapData,
     PlayerInput,
     GameState,
+    GameStateUpdate,
 }
 
 impl MessageType {
@@ -45,6 +46,7 @@ impl MessageType {
             MessageType::MapData => 2,
             MessageType::PlayerInput => 3,
             MessageType::GameState => 4,
+            MessageType::GameStateUpdate => 5,
         }
     }
 
@@ -55,6 +57,7 @@ impl MessageType {
             2 => Some(MessageType::MapData),
             3 => Some(MessageType::PlayerInput),
             4 => Some(MessageType::GameState),
+            5 => Some(MessageType::GameStateUpdate),
             _ => None,
         }
     }
@@ -223,6 +226,7 @@ impl NetworkHandler {
         Ok(messages)
     }
 
+    //TODO : ist gerade bisschen doppelt aber networkhandler muss wissen an wen er was schickt wenn server
     fn handle_server_message(
         &mut self,
         msg_type: MessageType,
@@ -238,16 +242,19 @@ impl NetworkHandler {
                     .any(|c| c.endpoint == client.endpoint)
                 {
                     self.connected_clients.push(client);
-                    kprintln!("push New client connected: {:?}", client.endpoint);
+                    kprintln!("New client connected: {:?}", client.endpoint);
                 }
             }
             MessageType::MapRequest => {
                 // Send map to requesting client
-                kprintln!("Client {:?} requested map data", client.endpoint);
                 if let Some(ref map) = self.current_map {
                     let map_data = map.serialize();
                     self.send_map_to_client(&map_data, client)?;
                 }
+            }
+            MessageType::PlayerInput => {
+                // Store player input for game to process
+                kprintln!("Received player input from client: {:?}", client.endpoint);
             }
             _ => {}
         }
@@ -285,6 +292,38 @@ impl NetworkHandler {
             }
         }
         None
+    }
+
+    pub fn send_player_input(&mut self, input_data: &[u8]) -> Result<(), String> {
+        self.send_message_type(MessageType::PlayerInput, input_data)
+    }
+
+    pub fn send_game_state(&mut self, state_data: &[u8]) -> Result<(), String> {
+        self.send_message_type(MessageType::GameStateUpdate, state_data)
+    }
+
+    pub fn broadcast_game_state(&mut self, state_data: &[u8]) -> Result<(), String> {
+        for client in self.connected_clients.clone() {
+            if let Err(e) = self.send_game_state_to_client(state_data, client) {
+                kprintln!("Failed to send game state to client {:?}: {}", client.endpoint, e);
+            }
+        }
+        Ok(())
+    }
+
+    fn send_game_state_to_client(&mut self, state_data: &[u8], client: UdpMetadata) -> Result<(), String> {
+        let mut message = Vec::new();
+        message.push(MessageType::GameStateUpdate.to_u8());
+        message.extend_from_slice(state_data);
+
+        if self.socket.poll(IO::Write) {
+            let mut sockets = SOCKETS.lock();
+            let socket = sockets.get_mut::<udp::Socket>(self.socket.handle);
+            if socket.send_slice(&message, client).is_err() {
+                return Err("Failed to send game state to client".to_string());
+            }
+        }
+        Ok(())
     }
 }
 
