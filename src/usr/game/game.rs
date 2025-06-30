@@ -129,6 +129,15 @@ impl Game {
         // update Bullet positions
         // check Collisions between Players and Bullets
         // check if dead players need to respawn
+
+        //TODO DEBUG
+        if self.game_state.players.is_empty() {
+            //kprintln!("No players in game state, this should not happen!");
+        } else {
+            //TODO -> Wenn ich gedrückt halte dann komme ich auf positionen auf die ich sonst nicht kommen dürfte... debuggen
+            kprintln!("playerpos at tick: {}, {}",
+                self.game_state.players[0].x, self.game_state.players[0].y);
+        }
     }
 
     pub fn draw(&mut self) {

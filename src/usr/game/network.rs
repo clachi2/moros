@@ -206,12 +206,12 @@ impl NetworkHandler {
                 if size > 0 {
                     if let Some(msg_type) = MessageType::from_u8(self.buffer[0]) {
                         let data = self.buffer[1..size].to_vec();
-                        kprintln!(
-                            "Received message of type {:?} from {:?}: {:?}",
-                            msg_type,
-                            remote_endpoint,
-                            core::str::from_utf8(&data).unwrap_or("Invalid UTF-8")
-                        );
+                        // kprintln!(
+                        //     "Received message of type {:?} from {:?}: {:?}",
+                        //     msg_type,
+                        //     remote_endpoint,
+                        //     core::str::from_utf8(&data).unwrap_or("Invalid UTF-8")
+                        // );
 
                         if self.is_server {
                             self.handle_server_message(msg_type.clone(), &data, remote_endpoint)?;
