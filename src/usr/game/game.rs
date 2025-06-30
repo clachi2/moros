@@ -64,7 +64,7 @@ impl Game {
         //
         // // tests
         // self.game_state.players.push(state::Player {
-        //     id: 0,
+        //     id: 1,
         //     x: pos.0 as f64,
         //     y: pos.1 as f64,
         //     alive: true,
@@ -90,7 +90,7 @@ impl Game {
         self.renderer.deinit();
     }
 
-    pub fn tick(&mut self) {
+    pub fn tick(&mut self, is_server: bool) {
         // Handle network messages
         self.handle_network_messages();
 
@@ -103,41 +103,37 @@ impl Game {
         self.game_state.last_tick = current_time;
 
         // update Player positions
-        for player in &mut self.game_state.players {
-            if player.alive {
-                // new wanted position based on movement direction and tick delta
-                let new_pos = player.next_wanted_position(tick_delta);
-                if  !self.game_state.map.is_pos_colliding(new_pos.0 as isize, new_pos.1 as isize) {
-                    // If the new position collides with a wall, do not move
-                    player.x = new_pos.0;
-                    player.y = new_pos.1;
-                }
-                else if !self.game_state.map.is_pos_colliding(player.x as isize, new_pos.1 as isize) {
-                    // only move vertically if horizontal movement is blocked
-                    player.y = new_pos.1;
-                }
-                else if !self.game_state.map.is_pos_colliding(new_pos.0 as isize, player.y as isize) {
-                    // only move horizontally if vertical movement is blocked
-                    player.x = new_pos.0;
-                }
-                else {
-                    // check of each pixel of line between old and new position if it collides with a wall
+        if is_server {
+            for player in &mut self.game_state.players {
+                if player.alive {
+                    // new wanted position based on movement direction and tick delta
+                    let new_pos = player.next_wanted_position(tick_delta);
+                    if  !self.game_state.map.is_pos_colliding(new_pos.0 as isize, new_pos.1 as isize) {
+                        // If the new position collides with a wall, do not move
+                        player.x = new_pos.0;
+                        player.y = new_pos.1;
+                    }
+                    else if !self.game_state.map.is_pos_colliding(player.x as isize, new_pos.1 as isize) {
+                        // only move vertically if horizontal movement is blocked
+                        player.y = new_pos.1;
+                    }
+                    else if !self.game_state.map.is_pos_colliding(new_pos.0 as isize, player.y as isize) {
+                        // only move horizontally if vertical movement is blocked
+                        player.x = new_pos.0;
+                    }
+                    else {
+                        // check of each pixel of line between old and new position if it collides with a wall
+                    }
                 }
             }
+        } else {
+            // Client does not update player positions, just draws the current state
         }
+
 
         // update Bullet positions
         // check Collisions between Players and Bullets
         // check if dead players need to respawn
-
-        //TODO DEBUG
-        if self.game_state.players.is_empty() {
-            //kprintln!("No players in game state, this should not happen!");
-        } else {
-            //TODO -> Wenn ich gedrückt halte dann komme ich auf positionen auf die ich sonst nicht kommen dürfte... debuggen
-            kprintln!("playerpos at tick: {}, {}",
-                self.game_state.players[0].x, self.game_state.players[0].y);
-        }
     }
 
     pub fn draw(&mut self) {

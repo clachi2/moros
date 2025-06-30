@@ -40,14 +40,12 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         game.set_user_input(0, user_input);
 
         // If client, send user input to server
-        // if !is_server {
-        //     //TODO auf id setzen
-        //     if let Err(e) = game.send_user_input_to_server(0) {
-        //         kprintln!("Failed to send user input to server: {}", e);
-        //     }
-        // }
-
-        ;
+        if !is_server {
+            //TODO auf id setzen
+            if let Err(e) = game.send_user_input_to_server(0) {
+                kprintln!("Failed to send user input to server: {}", e);
+            }
+        }
 
         console::disable_echo();
         console::enable_raw();
@@ -72,7 +70,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         console::enable_echo();
         console::disable_raw();
 
-        game.tick();
+        game.tick(is_server);
 
         // If server, broadcast game state to all clients
         if is_server {
