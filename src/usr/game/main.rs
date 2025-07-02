@@ -4,7 +4,8 @@ use crate::sys;
 use crate::sys::console;
 use crate::sys::keyboard::{DOWN, LEFT, RIGHT, UP};
 use crate::sys::mouse::get_mouse_buffer;
-use crate::usr::game::state::{Map, UserInput};
+use crate::usr::game::map::Map;
+use crate::usr::game::player::UserInput;
 
 //G640x480x16
 const WIDTH: usize = 320;
@@ -16,8 +17,8 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     if args.iter().any(|&arg| arg == "-h" || arg == "--help") {
         return help();
     }
-    let is_server = args.iter().any(|&arg| arg == "-s" || arg == "--server");
-    let ip = args.iter().find(|&&arg| arg.starts_with("-ip="));
+    // let is_server = args.iter().any(|&arg| arg == "-s" || arg == "--server");
+    // let ip = args.iter().find(|&&arg| arg.starts_with("-ip="));
 
     let mut game = crate::usr::game::game::Game::new(WIDTH, HEIGHT);
     game.init();
@@ -25,11 +26,12 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
 
     let mut mouse_x: i32 = 0;
     let mut mouse_y: i32 = 0;
+    let mut shooting = false;
     get_mouse_buffer().clear_events();
 
     loop {
         // parse input to game
-        let user_input = get_user_input(&mut mouse_x, &mut mouse_y);
+        let user_input = get_user_input(&mut mouse_x, &mut mouse_y, &mut shooting);
         game.set_user_input(0, user_input);
 
         console::disable_echo();
@@ -58,19 +60,19 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         game.draw();
         sys::clk::halt();
     }
-
-    Ok(())
 }
 
-fn get_user_input(mouse_x: &mut i32, mouse_y: &mut i32) -> UserInput {
+fn get_user_input(mouse_x: &mut i32, mouse_y: &mut i32, shooting: &mut bool) -> UserInput {
     // get mouse and keyboard input
     let ord = core::sync::atomic::Ordering::Relaxed;
     let up = UP.load(ord);
     let down = DOWN.load(ord);
     let left = LEFT.load(ord);
     let right = RIGHT.load(ord);
-    let mut shooting = false;
+    let mut new_shooting = false;
+    let mut atleast_once = false;
     while let Some(event) = get_mouse_buffer().get_last_event() {
+        atleast_once = true;
         *mouse_x += event.x_movement as i32;
         *mouse_y += event.y_movement as i32;
         if *mouse_x < 0 {
@@ -83,10 +85,19 @@ fn get_user_input(mouse_x: &mut i32, mouse_y: &mut i32) -> UserInput {
         } else if *mouse_y >= HEIGHT as i32 {
             *mouse_y = (HEIGHT - 1) as i32;
         }
-        shooting = shooting | event.is_left_click(); // shooting if left mouse button is pressed atleast once per tick
+        new_shooting = new_shooting | event.is_left_click(); // shooting if left mouse button is pressed atleast once per tick
     }
     let map_mouse_x = *mouse_x as isize;
     let map_mouse_y = *mouse_y as isize;
+
+    if atleast_once {
+        *shooting = new_shooting; // update shooting state only if there was a mouse event
+    }
+    let shooting = if atleast_once {
+        new_shooting
+    } else {
+        *shooting // keep the previous state if no mouse event occurred
+    };
 
     let user_input = UserInput {
         up,

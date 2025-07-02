@@ -1,4 +1,4 @@
-use crate::sys;
+use crate::{sys};
 use nolock::queues::mpmc;
 use nolock::queues::mpmc::bounded::scq::{Receiver, Sender};
 use spin::{Mutex, Once};

@@ -43,6 +43,7 @@ impl NetworkHandler {
     }
 
     pub fn init(&mut self, is_server: bool, ip: Option<&str>) -> Result<(), String> {
+        kprintln!("NetworkHandler::init() called with is_server: {}, ip: {:?}", is_server, ip);
         self.is_server = is_server;
         if self.is_server {
             self.set_ip("192.168.0.1").expect("TODO: panic message");
@@ -66,8 +67,8 @@ impl NetworkHandler {
     }
 
     pub fn set_ip(&mut self, ip: &str) -> Result<(), String> {
-        if let ipv4 = Ipv4Addr::from_str(ip) {
-            let addr = IpAddress::from(ipv4.unwrap());
+        if let Ok(ipv4) = Ipv4Addr::from_str(ip) {
+            let addr = IpAddress::from(ipv4);
             return if fs::write("/dev/net/ip", IpCidr::new(addr, 24).to_string().as_bytes())
                 .is_err()
             {
@@ -120,6 +121,8 @@ impl NetworkHandler {
     }
 
     pub fn send_message(&mut self, message: &str) -> Result<(), String> {
+
+        kprintln!( "NetworkHandler::send_message() called with message: {}", message);
 
         Ok(())
     }

@@ -257,13 +257,17 @@ unsafe fn page_table_frame() -> PhysFrame {
 }
 
 pub unsafe fn page_table() -> &'static mut PageTable {
-    sys::mem::create_page_table(page_table_frame())
+    unsafe {
+        sys::mem::create_page_table(page_table_frame())
+    }
 }
 
 pub unsafe fn alloc(layout: Layout) -> *mut u8 {
     let table = PROCESS_TABLE.read();
     let proc = &table[id()];
-    proc.allocator.alloc(layout)
+    unsafe {
+        proc.allocator.alloc(layout)
+    }
 }
 
 pub unsafe fn free(ptr: *mut u8, layout: Layout) {
@@ -272,7 +276,9 @@ pub unsafe fn free(ptr: *mut u8, layout: Layout) {
     let bottom = proc.allocator.lock().bottom();
     let top = proc.allocator.lock().top();
     if bottom <= ptr && ptr < top {
-        proc.allocator.dealloc(ptr, layout);
+        unsafe {
+            proc.allocator.dealloc(ptr, layout);
+        }
     } else { // FIXME: Uncomment to see errors
         //let size = layout.size();
         //let plural = if size != 1 { "s" } else { "" };

@@ -90,7 +90,9 @@ impl AcpiHandler for MorosAcpiHandler {
         let phys_addr = PhysAddr::new(addr as u64);
         let virt_addr = sys::mem::phys_to_virt(phys_addr);
         let ptr = NonNull::new(virt_addr.as_mut_ptr()).unwrap();
-        PhysicalMapping::new(addr, ptr, size, size, Self)
+        unsafe{
+            PhysicalMapping::new(addr, ptr, size, size, Self)
+        }
     }
 
     fn unmap_physical_region<T>(_region: &PhysicalMapping<Self, T>) {}

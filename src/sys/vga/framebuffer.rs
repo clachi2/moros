@@ -1,7 +1,5 @@
 use crate::api::font::Font;
 use crate::api::fs::write;
-use crate::kprint;
-use crate::kprintln;
 use alloc::vec;
 use alloc::vec::Vec;
 
@@ -59,9 +57,9 @@ impl Framebuffer {
         &self.internal_buffer
     }
 
-    pub fn clear(&mut self) {
+    pub fn clear(&mut self, color: u8) {
         for byte in self.internal_buffer.iter_mut() {
-            *byte = 0x00;
+            *byte = color;
         }
     }
 
@@ -78,17 +76,31 @@ impl Framebuffer {
         }
     }
 
-    pub fn draw_line(&mut self, x1: isize, y1: isize, x2: isize, y2: isize, color: u8) {
-        if x1 >= self.width as isize
-            || y1 >= self.height as isize
-            || x2 >= self.width as isize
-            || y2 >= self.height as isize
-        {
-            return;
+    pub fn draw_line(&mut self, mut x1: isize, mut y1: isize, mut x2: isize, mut y2: isize, color: u8) {
+        if x1 >= self.width as isize {
+            x1 = self.width as isize - 1;
+        }
+        if y1 >= self.height as isize {
+            y1 = self.height as isize - 1;
+        }
+        if x2 >= self.width as isize {
+            x2 = self.width as isize - 1;
+        }
+        if y2 >= self.height as isize {
+            y2 = self.height as isize - 1;
         }
 
-        let dx = (x2 as isize - x1 as isize).abs();
-        let dy = (y2 as isize - y1 as isize).abs();
+
+        // if x1 >= self.width as isize
+        //     || y1 >= self.height as isize
+        //     || x2 >= self.width as isize
+        //     || y2 >= self.height as isize
+        // {
+        //     return;
+        // }
+
+        let dx = (x2- x1).abs();
+        let dy = (y2- y1).abs();
         let sx = if x1 < x2 { 1 } else { -1 };
         let sy = if y1 < y2 { 1 } else { -1 };
         let mut err = dx - dy;

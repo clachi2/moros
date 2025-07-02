@@ -11,14 +11,18 @@ pub unsafe fn active_page_table() -> &'static mut PageTable {
     let phys_addr = frame.start_address();
     let virt_addr = super::phys_to_virt(phys_addr);
     let page_table_ptr: *mut PageTable = virt_addr.as_mut_ptr();
-    &mut *page_table_ptr // unsafe
+    unsafe {
+        &mut *page_table_ptr // unsafe
+    }
 }
 
 pub unsafe fn create_page_table(frame: PhysFrame) -> &'static mut PageTable {
     let phys_addr = frame.start_address();
     let virt_addr = super::phys_to_virt(phys_addr);
     let page_table_ptr: *mut PageTable = virt_addr.as_mut_ptr();
-    &mut *page_table_ptr // unsafe
+    unsafe {
+        &mut *page_table_ptr // unsafe
+    }
 }
 
 pub fn alloc_pages(
