@@ -2,6 +2,7 @@ use crate::api::console::Style;
 use crate::api::process::ExitCode;
 use crate::kprintln;
 use crate::sys;
+use crate::sys::clk::boot_time;
 use crate::sys::console;
 use crate::sys::keyboard::{DOWN, LEFT, RIGHT, UP};
 use crate::sys::mouse::get_mouse_buffer;
@@ -13,6 +14,7 @@ const WIDTH: usize = 320;
 const HEIGHT: usize = 200;
 const SERVER_IP: &str = "192.168.0.1";
 const SERVER_PORT: u16 = 1234;
+const BROADCAST_RATE: f64 = 20.0; // Broadcast rate per second
 
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     if args.iter().any(|&arg| arg == "-h" || arg == "--help") {
@@ -33,6 +35,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     let mut mouse_x: i32 = 0;
     let mut mouse_y: i32 = 0;
     let mut shooting = false;
+    let mut last_broadcast = 0.0;
     get_mouse_buffer().clear_events();
 
     loop {
@@ -64,7 +67,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
                         let mut map = Map::new(320, 200, 12, 10, 20);
                         map.auto_set_walls();
                         game.set_and_draw_map(map);
-                    },
+                    }
                     _ => {}
                 }
             }
@@ -74,10 +77,14 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
 
         game.tick(is_server);
 
-        // If server, broadcast game state to all clients
+        // If server, broadcast game state to all clients (rate limited)
         if is_server {
-            if let Err(e) = game.broadcast_game_state_to_clients() {
-                kprintln!("Failed to broadcast game state: {}", e);
+            let current_time = boot_time();
+            if current_time - last_broadcast >= 1.0 / BROADCAST_RATE {
+                if let Err(e) = game.broadcast_game_state_to_clients() {
+                    kprintln!("Failed to broadcast game state: {}", e);
+                }
+                last_broadcast = current_time;
             }
         }
 

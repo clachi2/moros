@@ -1,15 +1,16 @@
-
 use crate::sys::clk::boot_time;
+use crate::usr::game::bullet::Bullet;
+use crate::usr::game::map::Map;
 use crate::usr::game::network::{MessageType, NetworkHandler};
+use crate::usr::game::player::{Player, UserInput};
 use crate::usr::game::renderer;
 use crate::usr::game::renderer::Color;
 use crate::usr::game::state;
+use crate::usr::game::state::{
+    GUI_WIDTH, PLAYER_SIZE, SHOOTING_RATE_PER_SECOND, Serializable, TICK_RATE,
+};
 use alloc::string::{String, ToString};
-use crate::usr::game::state::{GUI_WIDTH, PLAYER_SIZE, Serializable, SHOOTING_RATE_PER_SECOND, TICK_RATE};
 use alloc::vec::Vec;
-use crate::usr::game::bullet::Bullet;
-use crate::usr::game::map::Map;
-use crate::usr::game::player::{Player, UserInput};
 
 pub(crate) struct Game {
     game_state: state::GameState,
@@ -138,7 +139,9 @@ impl Game {
         }
 
         // Update Bullet positions
-        self.game_state.bullets.retain_mut(|bullet| bullet.update(tick_delta));
+        self.game_state
+            .bullets
+            .retain_mut(|bullet| bullet.update(tick_delta));
 
         // Check Collisions between Players and Bullets
         // self.check_player_bullet_collisions();
@@ -360,7 +363,7 @@ impl Game {
                             pointing_to: (0, 0),
                             color: Color::Green as u8, // TODO: Randomize color
                             points: 0,
-                            ammo: 10000,
+                            ammo: 1000,
                             last_shot: 0.0,
                         };
                         self.game_state.players.push(new_player);
@@ -378,7 +381,9 @@ impl Game {
         for player in &self.game_state.players {
             if player.id == player_id {
                 let input_data = player.user_input.serialize();
-                self.network_handler.send_player_input(&input_data).expect("TODO: panic message");
+                self.network_handler
+                    .send_player_input(&input_data)
+                    .expect("TODO: panic message");
                 return Ok(());
             }
         }
@@ -394,6 +399,12 @@ impl Game {
 
     pub fn broadcast_game_state_to_clients(&mut self) -> Result<(), String> {
         let state_data = self.serialize_state();
+        kprintln!(
+            "Game state size: {} bytes, {} players, {} bullets",
+            state_data.len(),
+            self.game_state.players.len(),
+            self.game_state.bullets.len()
+        );
         self.network_handler.broadcast_game_state(&state_data)
     }
 

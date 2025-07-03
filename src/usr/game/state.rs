@@ -1,7 +1,7 @@
-use alloc::vec::Vec;
 use crate::usr::game::bullet::Bullet;
 use crate::usr::game::map::Map;
 use crate::usr::game::player::Player;
+use alloc::vec::Vec;
 
 pub static PLAYER_SPEED: f64 = 40.0; // Speed of player movement per tick
 pub static PLAYER_SIZE: usize = 8; // Size of the player in pixels
@@ -42,8 +42,13 @@ impl Serializable for GameState {
             result.extend(player_data);
         }
 
-        // Serialize bullets count (placeholder for now)
-        result.extend_from_slice(&(0u32).to_le_bytes()); // No bullets serialized yet
+        // Serialize bullets count and bullets
+        result.extend_from_slice(&(self.bullets.len() as u32).to_le_bytes());
+        for bullet in &self.bullets {
+            let bullet_data = bullet.serialize();
+            result.extend_from_slice(&(bullet_data.len() as u32).to_le_bytes());
+            result.extend(bullet_data);
+        }
 
         // Serialize current_player_index (4 bytes)
         result.extend_from_slice(&(self.current_player_index as u32).to_le_bytes());
@@ -113,10 +118,38 @@ impl Serializable for GameState {
             offset += player_len;
         }
 
-        // Skip bullets count (not implemented yet)
-        // TODO implement bullet serialization
+        // Deserialize bullets
+        let mut bullets = Vec::new();
         if data.len() >= offset + 4 {
+            let bullets_count = u32::from_le_bytes([
+                data[offset],
+                data[offset + 1],
+                data[offset + 2],
+                data[offset + 3],
+            ]) as usize;
             offset += 4;
+
+            for _ in 0..bullets_count {
+                if data.len() < offset + 4 {
+                    break;
+                }
+
+                let bullet_len = u32::from_le_bytes([
+                    data[offset],
+                    data[offset + 1],
+                    data[offset + 2],
+                    data[offset + 3],
+                ]) as usize;
+                offset += 4;
+
+                if data.len() < offset + bullet_len {
+                    break;
+                }
+
+                let bullet = Bullet::deserialize(&data[offset..offset + bullet_len]);
+                bullets.push(bullet);
+                offset += bullet_len;
+            }
         }
 
         // Deserialize current_player_index
@@ -152,7 +185,7 @@ impl Serializable for GameState {
         GameState {
             map,
             players,
-            bullets: Vec::new(), // Not implemented yet
+            bullets,
             current_player_index,
             last_tick,
         }
@@ -170,4 +203,3 @@ impl GameState {
         }
     }
 }
-

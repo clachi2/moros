@@ -3,7 +3,8 @@ use crate::api::fs::{FileIO, IO};
 use crate::kprintln;
 use crate::sys::net::socket::SOCKETS;
 use crate::sys::net::socket::udp::UdpSocket;
-use crate::usr::game::state::{Serializable};
+use crate::usr::game::map::Map;
+use crate::usr::game::state::Serializable;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::net::Ipv4Addr;
@@ -14,9 +15,8 @@ use smoltcp::socket::udp;
 use smoltcp::socket::udp::UdpMetadata;
 use smoltcp::wire::{IpAddress, IpCidr};
 use spin::Once;
-use crate::usr::game::map::Map;
 
-const BUFFER_SIZE: usize = 1024;
+const BUFFER_SIZE: usize = 8192;
 
 static SENDING_BUFFER: Once<MessageQueue> = Once::new();
 static RECEIVING_BUFFER: Once<MessageQueue> = Once::new();
@@ -66,7 +66,7 @@ impl MessageType {
 
 pub struct NetworkHandler {
     socket: UdpSocket,
-    buffer: [u8; 1024],
+    buffer: [u8; 8192],
     is_server: bool,
     connected_clients: Vec<UdpMetadata>,
     current_map: Option<Map>,
@@ -76,7 +76,7 @@ impl NetworkHandler {
     pub fn new() -> Self {
         NetworkHandler {
             socket: UdpSocket::new(),
-            buffer: [0; 1024],
+            buffer: [0; 8192],
             is_server: false,
             connected_clients: Vec::new(),
             current_map: None,
@@ -107,7 +107,6 @@ impl NetworkHandler {
         }
 
         Ok(())
-
     }
 
     pub fn set_server(&mut self) {
@@ -228,7 +227,8 @@ impl NetworkHandler {
             }
             MessageType::PlayerInput => {
                 // Store player input for game to process
-                kprintln!("Received player input from client: {:?}", client.endpoint);
+                // kprintln!("Received player input from client: {:?}", client.endpoint);
+                // TODO hierhin lagern
             }
             _ => {}
         }
@@ -273,9 +273,39 @@ impl NetworkHandler {
     }
 
     pub fn broadcast_game_state(&mut self, state_data: &[u8]) -> Result<(), String> {
-        for client in self.connected_clients.clone() {
-            if let Err(e) = self.send_game_state_to_client(state_data, client) {
-                kprintln!("Failed to send game state to client {:?}: {}", client.endpoint, e);
+        kprintln!(
+            "Broadcasting game state of size: {} bytes",
+            state_data.len()
+        );
+
+        // Split into chunks if too large
+        const MAX_CHUNK_SIZE: usize = 1400; // Safe UDP packet size
+
+        if state_data.len() > MAX_CHUNK_SIZE {
+            kprintln!(
+                "Game state too large ({}), splitting into chunks",
+                state_data.len()
+            );
+
+            let chunks: Vec<&[u8]> = state_data.chunks(MAX_CHUNK_SIZE).collect();
+            for client in self.connected_clients.clone() {
+                if let Err(e) = self.send_chunked_game_state_to_client(&chunks, client) {
+                    kprintln!(
+                        "Failed to send chunked game state to client {:?}: {}",
+                        client.endpoint,
+                        e
+                    );
+                }
+            }
+        } else {
+            for client in self.connected_clients.clone() {
+                if let Err(e) = self.send_game_state_to_client(state_data, client) {
+                    kprintln!(
+                        "Failed to send game state to client {:?}: {}",
+                        client.endpoint,
+                        e
+                    );
+                }
             }
         }
         Ok(())
@@ -292,6 +322,20 @@ impl NetworkHandler {
             if socket.send_slice(&message, client).is_err() {
                 return Err("Failed to send game state to client".to_string());
             }
+        }
+        Ok(())
+    }
+
+    fn send_chunked_game_state_to_client(
+        &mut self,
+        chunks: &[&[u8]],
+        client: UdpMetadata,
+    ) -> Result<(), String> {
+        // For now, just send the first chunk to avoid complexity
+        // In a full implementation, you'd need chunk reassembly
+        kprintln!("Sending only first chunk to avoid complexity");
+        if let Some(first_chunk) = chunks.first() {
+            self.send_game_state_to_client(first_chunk, client)?;
         }
         Ok(())
     }
@@ -319,7 +363,6 @@ impl MessageQueue {
         }
         if let Err(_) = self.sender.try_enqueue(message) {
             panic!("MessageQueue is full!");
-
         }
     }
 

@@ -1,5 +1,6 @@
+use crate::kprintln;
 use crate::usr::game::map::Map;
-use crate::usr::game::state::{BULLET_SPEED, BULLET_TRAVEL_DIST};
+use crate::usr::game::state::{BULLET_SPEED, BULLET_TRAVEL_DIST, Serializable};
 use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 use num_traits::Float;
@@ -382,6 +383,119 @@ impl Bullet {
                     return false;
                 }
             }
+        }
+    }
+}
+
+impl Serializable for Bullet {
+    fn serialize(&self) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        // Serialize only essential data for network transmission
+        // Position (8 bytes each for x and y as f64)
+        result.extend_from_slice(&self.x.to_le_bytes());
+        result.extend_from_slice(&self.y.to_le_bytes());
+
+        // Serialize pointing towards (8 bytes each as f64)
+        result.extend_from_slice(&self.pointing_towards_x.to_le_bytes());
+        result.extend_from_slice(&self.pointing_towards_y.to_le_bytes());
+
+        // Serialize already_traveled (8 bytes)
+        result.extend_from_slice(&self.already_traveled.to_le_bytes());
+
+        // Don't serialize path_queue and current_segment_start to save space
+        // Clients will recalculate the path locally if needed
+
+        result
+    }
+
+    fn deserialize(data: &[u8]) -> Self {
+        if data.len() < 40 {
+            // Minimum size for essential fields only
+            return Bullet {
+                x: 0.0,
+                y: 0.0,
+                pointing_towards_x: 0.0,
+                pointing_towards_y: 0.0,
+                already_traveled: 0.0,
+                current_segment_start: (0.0, 0.0),
+                path_queue: VecDeque::new(),
+            };
+        }
+
+        let mut offset = 0;
+
+        // Deserialize position
+        let x = f64::from_le_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
+        ]);
+        offset += 8;
+
+        let y = f64::from_le_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
+        ]);
+        offset += 8;
+
+        // Deserialize pointing towards
+        let pointing_towards_x = f64::from_le_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
+        ]);
+        offset += 8;
+
+        let pointing_towards_y = f64::from_le_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
+        ]);
+        offset += 8;
+
+        // Deserialize already_traveled
+        let already_traveled = f64::from_le_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
+        ]);
+
+        // Create bullet with minimal data - path will be empty and needs recalculation
+        Bullet {
+            x,
+            y,
+            pointing_towards_x,
+            pointing_towards_y,
+            already_traveled,
+            current_segment_start: (x, y), // Use current position as segment start
+            path_queue: VecDeque::new(),   // Empty path queue - will be recalculated if needed
         }
     }
 }
