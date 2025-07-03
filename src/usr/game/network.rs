@@ -107,7 +107,7 @@ impl NetworkHandler {
                 kprintln!("Connected to server");
                 // Send connection request
                 // TODO einfach 100 mal schicken gerade .. brauche noch ack
-                for _ in 0..100 {
+                for _ in 0..1000 {
                     self.send_message_type(MessageType::Connect, &[])?;
                 }
             }
@@ -232,17 +232,7 @@ impl NetworkHandler {
                 }
             }
             MessageType::PlayerInput => {
-                // Extract player ID from sender's IP
-                let player_id = match client.endpoint.addr {
-                    smoltcp::wire::IpAddress::Ipv4(ipv4) => ipv4.octets()[3] as usize,
-                    _ => 0,
-                };
-                kprintln!("Received input from player {}", player_id);
-                if !data.is_empty() {
-                    //TODO PROBLEM MIT ID REF
-                    self.deserialize_user_input(player_id, &data);
-                    //kprintln!("Received input from player {}", player_id);
-                }
+                //TODO umlagern
             }
             _ => {}
         }

@@ -8,10 +8,7 @@ use crate::usr::game::renderer::Color;
 use crate::usr::game::state;
 use alloc::format;
 use alloc::string::{String, ToString};
-use crate::usr::game::state::{
-    GUI_WIDTH, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, SHOOTING_RATE_PER_SECOND,
-    TICK_RATE,
-};
+use crate::usr::game::state::{GUI_WIDTH, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, Serializable, SHOOTING_RATE_PER_SECOND, TICK_RATE};
 use alloc::vec::Vec;
 
 pub(crate) struct Game {
@@ -113,27 +110,28 @@ impl Game {
                     }
                 }
 
-            if player.alive && player.user_input.shooting && player.ammo > 0 {
-                // Check if enough time has passed since last shot (rate limiting)
-                let time_since_last_shot = current_time - player.last_shot;
-                let min_shot_interval = 1.0 / SHOOTING_RATE_PER_SECOND;
+                if player.alive && player.user_input.shooting && player.ammo > 0 {
+                    // Check if enough time has passed since last shot (rate limiting)
+                    let time_since_last_shot = current_time - player.last_shot;
+                    let min_shot_interval = 1.0 / SHOOTING_RATE_PER_SECOND;
 
-                if time_since_last_shot >= min_shot_interval {
-                    let target_x = (player.user_input.map_mouse_x - GUI_WIDTH as isize) as f64;
-                    let target_y = player.user_input.map_mouse_y as f64;
+                    if time_since_last_shot >= min_shot_interval {
+                        let target_x = (player.user_input.map_mouse_x - GUI_WIDTH as isize) as f64;
+                        let target_y = player.user_input.map_mouse_y as f64;
 
-                    let bullet = Bullet::new(
-                        player.x + (PLAYER_SIZE as f64 / 2.0), // Center of player
-                        player.y + (PLAYER_SIZE as f64 / 2.0),
-                        target_x,
-                        target_y,
-                        player.id,
-                        &self.game_state.map,
-                    );
-                    self.game_state.bullets.push(bullet);
+                        let bullet = Bullet::new(
+                            player.x + (PLAYER_SIZE as f64 / 2.0), // Center of player
+                            player.y + (PLAYER_SIZE as f64 / 2.0),
+                            target_x,
+                            target_y,
+                            player.id,
+                            &self.game_state.map,
+                        );
+                        self.game_state.bullets.push(bullet);
 
-                    player.ammo -= 1;
-                    player.last_shot = current_time;
+                        player.ammo -= 1;
+                        player.last_shot = current_time;
+                    }
                 }
             }
         }
@@ -144,7 +142,7 @@ impl Game {
             .retain_mut(|bullet| bullet.update(tick_delta));
 
         // Check Collisions between Players and Bullets
-        self.check_player_bullet_collisions();
+        self.handle_player_bullet_collisions();
 
         // Check if dead players need to respawn
         self.handle_player_respawning(current_time);
@@ -296,7 +294,19 @@ impl Game {
                             //kprintln!("Client: Map updated from server");
                         }
                     }
-                    MessageType::PlayerInput => {}
+                    MessageType::PlayerInput => {
+                        // Extract player ID from sender's IP
+                        let player_id = match sender.endpoint.addr {
+                            smoltcp::wire::IpAddress::Ipv4(ipv4) => ipv4.octets()[3] as usize,
+                            _ => 0,
+                        };
+
+                        if !data.is_empty() {
+                            //TODO PROBLEM MIT ID REF
+                            self.deserialize_user_input(player_id, &data);
+                            //kprintln!("Received input from player {}", player_id);
+                        }
+                    }
                     MessageType::GameStateUpdate => {
                         // Client receives game state update from server
                         if !data.is_empty() {

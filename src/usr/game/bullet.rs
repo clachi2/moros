@@ -17,7 +17,14 @@ pub(crate) struct Bullet {
 }
 
 impl Bullet {
-    pub fn new(start_x: f64, start_y: f64, target_x: f64, target_y: f64, shot_by: usize, map: &Map) -> Self {
+    pub fn new(
+        start_x: f64,
+        start_y: f64,
+        target_x: f64,
+        target_y: f64,
+        shot_by: usize,
+        map: &Map,
+    ) -> Self {
         let mut bullet = Bullet {
             x: start_x,
             y: start_y,
@@ -355,6 +362,9 @@ impl Serializable for Bullet {
         // Serialize already_traveled (4 bytes as f32)
         result.extend_from_slice(&(self.already_traveled as f32).to_le_bytes());
 
+        // Serialize shot_by (4 bytes as u32)
+        result.extend_from_slice(&(self.shot_by as u32).to_le_bytes());
+
         // Don't serialize path_queue and current_segment_start to save space
         // Clients will recalculate the path locally if needed
 
@@ -362,8 +372,8 @@ impl Serializable for Bullet {
     }
 
     fn deserialize(data: &[u8]) -> Self {
-        if data.len() < 20 {
-            // Minimum size for essential fields only (5 f32 values)
+        if data.len() < 24 {
+            // Minimum size for essential fields only (5 f32 values + 1 u32 value)
             return Bullet {
                 x: 0.0,
                 y: 0.0,
@@ -372,6 +382,7 @@ impl Serializable for Bullet {
                 already_traveled: 0.0,
                 current_segment_start: (0.0, 0.0),
                 path_queue: VecDeque::new(),
+                shot_by: 0,
             };
         }
 
@@ -419,6 +430,14 @@ impl Serializable for Bullet {
             data[offset + 3],
         ]) as f64;
 
+        // Deserialize shot_by (u32 to usize)
+        let shot_by = u32::from_le_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ]) as usize;
+
         // Create bullet with minimal data - path will be empty and needs recalculation
         Bullet {
             x,
@@ -428,6 +447,7 @@ impl Serializable for Bullet {
             already_traveled,
             current_segment_start: (x, y), // Use current position as segment start
             path_queue: VecDeque::new(),   // Empty path queue - will be recalculated if needed
+            shot_by,
         }
     }
 }
