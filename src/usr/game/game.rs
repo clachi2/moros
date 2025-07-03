@@ -399,12 +399,12 @@ impl Game {
 
     pub fn broadcast_game_state_to_clients(&mut self) -> Result<(), String> {
         let state_data = self.serialize_state();
-        kprintln!(
-            "Game state size: {} bytes, {} players, {} bullets",
-            state_data.len(),
-            self.game_state.players.len(),
-            self.game_state.bullets.len()
-        );
+        // kprintln!(
+        //     "Game state size: {} bytes, {} players, {} bullets",
+        //     state_data.len(),
+        //     self.game_state.players.len(),
+        //     self.game_state.bullets.len()
+        // );
         self.network_handler.broadcast_game_state(&state_data)
     }
 

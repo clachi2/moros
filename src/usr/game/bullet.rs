@@ -392,16 +392,16 @@ impl Serializable for Bullet {
         let mut result = Vec::new();
 
         // Serialize only essential data for network transmission
-        // Position (8 bytes each for x and y as f64)
-        result.extend_from_slice(&self.x.to_le_bytes());
-        result.extend_from_slice(&self.y.to_le_bytes());
+        // Position (4 bytes each for x and y as f32)
+        result.extend_from_slice(&(self.x as f32).to_le_bytes());
+        result.extend_from_slice(&(self.y as f32).to_le_bytes());
 
-        // Serialize pointing towards (8 bytes each as f64)
-        result.extend_from_slice(&self.pointing_towards_x.to_le_bytes());
-        result.extend_from_slice(&self.pointing_towards_y.to_le_bytes());
+        // Serialize pointing towards (4 bytes each as f32)
+        result.extend_from_slice(&(self.pointing_towards_x as f32).to_le_bytes());
+        result.extend_from_slice(&(self.pointing_towards_y as f32).to_le_bytes());
 
-        // Serialize already_traveled (8 bytes)
-        result.extend_from_slice(&self.already_traveled.to_le_bytes());
+        // Serialize already_traveled (4 bytes as f32)
+        result.extend_from_slice(&(self.already_traveled as f32).to_le_bytes());
 
         // Don't serialize path_queue and current_segment_start to save space
         // Clients will recalculate the path locally if needed
@@ -410,8 +410,8 @@ impl Serializable for Bullet {
     }
 
     fn deserialize(data: &[u8]) -> Self {
-        if data.len() < 40 {
-            // Minimum size for essential fields only
+        if data.len() < 20 {
+            // Minimum size for essential fields only (5 f32 values)
             return Bullet {
                 x: 0.0,
                 y: 0.0,
@@ -425,67 +425,47 @@ impl Serializable for Bullet {
 
         let mut offset = 0;
 
-        // Deserialize position
-        let x = f64::from_le_bytes([
+        // Deserialize position (f32 to f64)
+        let x = f32::from_le_bytes([
             data[offset],
             data[offset + 1],
             data[offset + 2],
             data[offset + 3],
-            data[offset + 4],
-            data[offset + 5],
-            data[offset + 6],
-            data[offset + 7],
-        ]);
-        offset += 8;
+        ]) as f64;
+        offset += 4;
 
-        let y = f64::from_le_bytes([
+        let y = f32::from_le_bytes([
             data[offset],
             data[offset + 1],
             data[offset + 2],
             data[offset + 3],
-            data[offset + 4],
-            data[offset + 5],
-            data[offset + 6],
-            data[offset + 7],
-        ]);
-        offset += 8;
+        ]) as f64;
+        offset += 4;
 
-        // Deserialize pointing towards
-        let pointing_towards_x = f64::from_le_bytes([
+        // Deserialize pointing towards (f32 to f64)
+        let pointing_towards_x = f32::from_le_bytes([
             data[offset],
             data[offset + 1],
             data[offset + 2],
             data[offset + 3],
-            data[offset + 4],
-            data[offset + 5],
-            data[offset + 6],
-            data[offset + 7],
-        ]);
-        offset += 8;
+        ]) as f64;
+        offset += 4;
 
-        let pointing_towards_y = f64::from_le_bytes([
+        let pointing_towards_y = f32::from_le_bytes([
             data[offset],
             data[offset + 1],
             data[offset + 2],
             data[offset + 3],
-            data[offset + 4],
-            data[offset + 5],
-            data[offset + 6],
-            data[offset + 7],
-        ]);
-        offset += 8;
+        ]) as f64;
+        offset += 4;
 
-        // Deserialize already_traveled
-        let already_traveled = f64::from_le_bytes([
+        // Deserialize already_traveled (f32 to f64)
+        let already_traveled = f32::from_le_bytes([
             data[offset],
             data[offset + 1],
             data[offset + 2],
             data[offset + 3],
-            data[offset + 4],
-            data[offset + 5],
-            data[offset + 6],
-            data[offset + 7],
-        ]);
+        ]) as f64;
 
         // Create bullet with minimal data - path will be empty and needs recalculation
         Bullet {

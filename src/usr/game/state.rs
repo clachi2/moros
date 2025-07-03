@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 
 pub static PLAYER_SPEED: f64 = 40.0; // Speed of player movement per tick
 pub static PLAYER_SIZE: usize = 8; // Size of the player in pixels
-pub static BULLET_SPEED: f64 = 40.0; // Speed of bullet movement per tick
+pub static BULLET_SPEED: f64 = 80.0; // Speed of bullet movement per tick
 pub static BULLET_TRAVEL_DIST: f64 = 200.0; // Maximum travel distance for bullets
 pub static SHOOTING_RATE_PER_SECOND: f64 = 1000.0; // Maximum travel distance for bullets
 pub static GUI_WIDTH: usize = 80;

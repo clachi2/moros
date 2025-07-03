@@ -273,10 +273,10 @@ impl NetworkHandler {
     }
 
     pub fn broadcast_game_state(&mut self, state_data: &[u8]) -> Result<(), String> {
-        kprintln!(
-            "Broadcasting game state of size: {} bytes",
-            state_data.len()
-        );
+        // kprintln!(
+        //     "Broadcasting game state of size: {} bytes",
+        //     state_data.len()
+        // );
 
         // Split into chunks if too large
         const MAX_CHUNK_SIZE: usize = 1400; // Safe UDP packet size

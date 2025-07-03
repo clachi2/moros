@@ -78,15 +78,17 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         game.tick(is_server);
 
         // If server, broadcast game state to all clients (rate limited)
-        if is_server {
-            let current_time = boot_time();
-            if current_time - last_broadcast >= 1.0 / BROADCAST_RATE {
-                if let Err(e) = game.broadcast_game_state_to_clients() {
-                    kprintln!("Failed to broadcast game state: {}", e);
-                }
-                last_broadcast = current_time;
-            }
-        }
+        // if is_server {
+        //     let current_time = boot_time();
+        //     if current_time - last_broadcast >= 1.0 / BROADCAST_RATE {
+        //         if let Err(e) = game.broadcast_game_state_to_clients() {
+        //             kprintln!("Failed to broadcast game state: {}", e);
+        //         }
+        //         last_broadcast = current_time;
+        //     }
+        // }
+
+        game.broadcast_game_state_to_clients().expect("TODO: panic message");
 
         game.draw();
         sys::clk::halt();
