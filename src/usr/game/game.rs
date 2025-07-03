@@ -1,12 +1,15 @@
 use crate::sys::clk::boot_time;
-use crate::usr::game::renderer;
-use crate::usr::game::renderer::Color;
-use crate::usr::game::state;
-use crate::usr::game::state::{GUI_WIDTH, PLAYER_SIZE, SHOOTING_RATE_PER_SECOND, TICK_RATE};
-use alloc::vec::Vec;
 use crate::usr::game::bullet::Bullet;
 use crate::usr::game::map::Map;
 use crate::usr::game::player::{Player, UserInput};
+use crate::usr::game::renderer;
+use crate::usr::game::renderer::Color;
+use crate::usr::game::state;
+use crate::usr::game::state::{
+    GUI_WIDTH, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, SHOOTING_RATE_PER_SECOND,
+    TICK_RATE,
+};
+use alloc::vec::Vec;
 
 pub(crate) struct Game {
     game_state: state::GameState,
@@ -101,24 +104,19 @@ impl Game {
                 let min_shot_interval = 1.0 / SHOOTING_RATE_PER_SECOND;
 
                 if time_since_last_shot >= min_shot_interval {
-                    // Calculate target position from mouse coordinates
                     let target_x = (player.user_input.map_mouse_x - GUI_WIDTH as isize) as f64;
                     let target_y = player.user_input.map_mouse_y as f64;
 
-                    // Spawn bullet
-                    // self.game_state.spawn_bullet(player.id, target_x, target_y);
-                    if player.ammo > 0 {
-                        let bullet = Bullet::new(
-                            player.x + (PLAYER_SIZE as f64 / 2.0), // Center of player
-                            player.y + (PLAYER_SIZE as f64 / 2.0),
-                            target_x,
-                            target_y,
-                            &self.game_state.map,
-                        );
-                        self.game_state.bullets.push(bullet);
-                    }
+                    let bullet = Bullet::new(
+                        player.x + (PLAYER_SIZE as f64 / 2.0), // Center of player
+                        player.y + (PLAYER_SIZE as f64 / 2.0),
+                        target_x,
+                        target_y,
+                        player.id,
+                        &self.game_state.map,
+                    );
+                    self.game_state.bullets.push(bullet);
 
-                    // Update player state
                     player.ammo -= 1;
                     player.last_shot = current_time;
                 }
@@ -126,7 +124,9 @@ impl Game {
         }
 
         // Update Bullet positions
-        self.game_state.bullets.retain_mut(|bullet| bullet.update(tick_delta));
+        self.game_state
+            .bullets
+            .retain_mut(|bullet| bullet.update(tick_delta));
 
         // Check Collisions between Players and Bullets
         // self.check_player_bullet_collisions();
@@ -135,15 +135,28 @@ impl Game {
         self.handle_player_respawning(current_time);
     }
 
-    fn check_player_bullet_collisions(&mut self) {
+    fn handle_player_bullet_collisions(&mut self) {
         let mut bullets_to_remove = Vec::new();
-        let mut players_to_kill = Vec::new();
+        // let mut players_to_kill = Vec::new();
 
         for (bullet_idx, bullet) in self.game_state.bullets.iter().enumerate() {
-            for (player_idx, player) in self.game_state.players.iter().enumerate() {
-                if player.alive && self.bullet_hits_player(bullet, player) {
+            for player in self.game_state.players.iter_mut(){
+                if player.alive
+                    && bullet.shot_by != player.id // bullet cant hit its owner
+                    && bullet.x < player.x + PLAYER_SIZE as f64
+                    && bullet.x > player.x
+                    && bullet.y < player.y + PLAYER_SIZE as f64
+                    && bullet.y > player.y
+                {
+                    let current_time = boot_time();
+                    player.alive = false;
+                    player.time_of_death = current_time;
+                    player.points = player.points.saturating_sub(POINTS_PER_DEATH_MINUS); // Decrease points on death
+                    if let Some(shot_by) = self.game_state.players.get_mut(bullet.shot_by) {
+                        shot_by.points += POINTS_PER_KILL; // Increase points for the shooter
+                    }
+
                     bullets_to_remove.push(bullet_idx);
-                    players_to_kill.push(player_idx);
                     break; // One bullet can only hit one player
                 }
             }
@@ -153,27 +166,6 @@ impl Game {
         for &bullet_idx in bullets_to_remove.iter().rev() {
             self.game_state.bullets.remove(bullet_idx);
         }
-
-        // Kill players that were hit
-        let current_time = boot_time();
-        for &player_idx in &players_to_kill {
-            if let Some(player) = self.game_state.players.get_mut(player_idx) {
-                player.alive = false;
-                player.time_of_death = current_time;
-                // TODO: Award points to the shooter
-            }
-        }
-    }
-
-    fn bullet_hits_player(&self, bullet: &Bullet, player: &Player) -> bool {
-        let bullet_size = 2.0; // Small bullet size
-        let player_size = PLAYER_SIZE as f64;
-
-        // Simple AABB collision detection
-        bullet.x < player.x + player_size
-            && bullet.x + bullet_size > player.x
-            && bullet.y < player.y + player_size
-            && bullet.y + bullet_size > player.y
     }
 
     fn handle_player_respawning(&mut self, current_time: f64) {

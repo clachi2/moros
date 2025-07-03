@@ -3,14 +3,16 @@ use crate::usr::game::bullet::Bullet;
 use crate::usr::game::map::Map;
 use crate::usr::game::player::Player;
 
-pub static PLAYER_SPEED: f64 = 40.0; // Speed of player movement per tick
-pub static PLAYER_SIZE: usize = 8; // Size of the player in pixels
-pub static BULLET_SPEED: f64 = 40.0; // Speed of bullet movement per tick
-pub static BULLET_TRAVEL_DIST: f64 = 200.0; // Maximum travel distance for bullets
-pub static SHOOTING_RATE_PER_SECOND: f64 = 1000.0; // Maximum travel distance for bullets
+pub static PLAYER_SPEED: f64 = 40.0;
+pub static PLAYER_SIZE: usize = 8;
+pub static BULLET_SPEED: f64 = 40.0;
+pub static BULLET_TRAVEL_DIST: f64 = 200.0;
+pub static SHOOTING_RATE_PER_SECOND: f64 = 5.0;
 pub static GUI_WIDTH: usize = 80;
-pub static TICK_RATE: f64 = 64.0; // Number of ticks per second
-pub static WALL_DENSITY: f32 = 0.5; // Density of walls in the map
+pub static TICK_RATE: f64 = 64.0;
+pub static WALL_DENSITY: f32 = 0.5;
+pub static POINTS_PER_KILL: usize = 1;
+pub static POINTS_PER_DEATH_MINUS: usize = 0;
 
 pub(crate) trait Serializable {
     fn serialize(&self) -> Vec<u8>;
