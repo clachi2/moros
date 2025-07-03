@@ -72,7 +72,6 @@ impl TcpSocket {
                         if connecting {
                             println!("Connection failed since already connecting");
                             continue;
-                            return Err(());
                         }
                         let cx = iface.context();
                         let dest = (addr, port);

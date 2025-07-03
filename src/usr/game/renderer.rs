@@ -1,7 +1,8 @@
 use nom::multi::length_count;
 use crate::api::fs::write;
 use crate::sys::vga::{VgaPalette, framebuffer};
-use crate::usr::game::state::{GUI_WIDTH, Map, PLAYER_SIZE};
+use crate::usr::game::map::Map;
+use crate::usr::game::state::{GUI_WIDTH, PLAYER_SIZE};
 
 pub(crate) enum Color {
     Black = 0x00,
@@ -69,7 +70,7 @@ impl Renderer {
         //set color palette
         VgaPalette::vga_256().write();
         // Clear the framebuffer
-        self.framebuffer.clear();
+        self.framebuffer.clear(Color::LightGray as u8);
     }
 
     pub fn deinit(&mut self) {
@@ -92,6 +93,17 @@ impl Renderer {
         }
     }
 
+    pub fn draw_bullet(&mut self, x : isize, y: isize) {
+        // Draw a simple bullet as a small square
+        let bullet_color = Color::Yellow as u8; // Yellow color
+        for dy in 0..2 {
+            for dx in 0..2 {
+                self.framebuffer
+                    .draw_pixel(x + dx as isize, y + dy as isize, bullet_color);
+            }
+        }
+    }
+
     pub fn draw_mouse_cursor(&mut self, x: isize, y: isize) {
         // Draw a simple crosshair as mouse cursor
         let cursor_color = Color::Red as u8; // White color
@@ -107,34 +119,34 @@ impl Renderer {
 
     pub fn draw_map_buffer(&mut self, map: Map) {
         // Clear the map buffer
-        self.map_buffer.clear();
+        self.map_buffer.clear(Color::LightGray as u8);
 
         // Draw the map tiles
         for y in 0..map.tiles_y as usize {
             for x in 0..map.tiles_x as usize {
                 let tile = map.tiles[y * map.tiles_x + x].clone();
-                let mut line = (0, 0, 0, 0);
+                let mut line ;
                 let x_i = x as isize;
                 let y_i = y as isize;
                 if tile.up {
                     line = map.wall_coords(x_i, y_i, 0);
                     self.map_buffer
-                        .draw_line(line.0, line.1, line.2, line.3, Color::White as u8);
+                        .draw_line(line.0, line.1, line.2, line.3, Color::Black as u8);
                 }
                 if tile.right {
                     line = map.wall_coords(x_i, y_i, 1);
                     self.map_buffer
-                        .draw_line(line.0, line.1, line.2, line.3, Color::White as u8);
+                        .draw_line(line.0, line.1, line.2, line.3, Color::Black as u8);
                 }
                 if tile.down {
                     line = map.wall_coords(x_i, y_i, 2);
                     self.map_buffer
-                        .draw_line(line.0, line.1, line.2, line.3, Color::White as u8);
+                        .draw_line(line.0, line.1, line.2, line.3, Color::Black as u8);
                 }
                 if tile.left {
                     line = map.wall_coords(x_i, y_i, 3);
                     self.map_buffer
-                        .draw_line(line.0, line.1, line.2, line.3, Color::White as u8);
+                        .draw_line(line.0, line.1, line.2, line.3, Color::Black as u8);
                 }
             }
         }

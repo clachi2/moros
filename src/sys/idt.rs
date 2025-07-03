@@ -213,6 +213,7 @@ macro_rules! wrap {
     ($fn: ident => $w:ident) => {
         #[naked]
         pub unsafe extern "sysv64" fn $w() {
+            unsafe{
             naked_asm!(
                 "push rax",
                 "push rcx",
@@ -239,6 +240,7 @@ macro_rules! wrap {
                 "iretq",
                 sym $fn
             );
+            }
         }
     };
 }

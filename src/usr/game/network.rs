@@ -106,6 +106,7 @@ impl NetworkHandler {
         }
 
         Ok(())
+
     }
 
     pub fn set_server(&mut self) {
@@ -113,14 +114,13 @@ impl NetworkHandler {
     }
 
     pub fn set_ip(&mut self, ip: &str) -> Result<(), String> {
-        if let ipv4 = Ipv4Addr::from_str(ip) {
-            let addr = IpAddress::from(ipv4.unwrap());
+        if let Ok(ipv4) = Ipv4Addr::from_str(ip) {
+            let addr = IpAddress::from(ipv4);
             return if fs::write("/dev/net/ip", IpCidr::new(addr, 24).to_string().as_bytes())
                 .is_err()
             {
                 Err("Failed to set IP address".to_string())
             } else {
-                kprintln!("IP address set to {}", ip);
                 Ok(())
             };
         }
@@ -349,6 +349,7 @@ impl MessageQueue {
         }
         if let Err(_) = self.sender.try_enqueue(message) {
             panic!("MessageQueue is full!");
+
         }
     }
 
