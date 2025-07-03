@@ -106,7 +106,10 @@ impl NetworkHandler {
             } else {
                 kprintln!("Connected to server");
                 // Send connection request
-                self.send_message_type(MessageType::Connect, &[])?;
+                // TODO einfach 100 mal schicken gerade .. brauche noch ack
+                for _ in 0..100 {
+                    self.send_message_type(MessageType::Connect, &[])?;
+                }
             }
         }
 
@@ -206,7 +209,6 @@ impl NetworkHandler {
     fn handle_server_message(
         &mut self,
         msg_type: MessageType,
-        //TODO evlt brauche ich das noch
         data: &[u8],
         client: UdpMetadata,
     ) -> Result<(), String> {
@@ -230,9 +232,17 @@ impl NetworkHandler {
                 }
             }
             MessageType::PlayerInput => {
-                // Store player input for game to process
-                // kprintln!("Received player input from client: {:?}", client.endpoint);
-                // TODO hierhin lagern
+                // Extract player ID from sender's IP
+                let player_id = match client.endpoint.addr {
+                    smoltcp::wire::IpAddress::Ipv4(ipv4) => ipv4.octets()[3] as usize,
+                    _ => 0,
+                };
+                kprintln!("Received input from player {}", player_id);
+                if !data.is_empty() {
+                    //TODO PROBLEM MIT ID REF
+                    self.deserialize_user_input(player_id, &data);
+                    //kprintln!("Received input from player {}", player_id);
+                }
             }
             _ => {}
         }
@@ -315,7 +325,11 @@ impl NetworkHandler {
         Ok(())
     }
 
-    fn send_game_state_to_client(&mut self, state_data: &[u8], client: UdpMetadata) -> Result<(), String> {
+    fn send_game_state_to_client(
+        &mut self,
+        state_data: &[u8],
+        client: UdpMetadata,
+    ) -> Result<(), String> {
         let mut message = Vec::new();
         message.push(MessageType::GameStateUpdate.to_u8());
         message.extend_from_slice(state_data);

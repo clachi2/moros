@@ -151,7 +151,7 @@ impl Game {
             .retain_mut(|bullet| bullet.update(tick_delta));
 
         // Check Collisions between Players and Bullets
-        // self.check_player_bullet_collisions();
+        self.check_player_bullet_collisions();
 
         // Check if dead players need to respawn
         self.handle_player_respawning(current_time);
@@ -311,19 +311,7 @@ impl Game {
                             //kprintln!("Client: Map updated from server");
                         }
                     }
-                    MessageType::PlayerInput => {
-                        // Extract player ID from sender's IP
-                        let player_id = match sender.endpoint.addr {
-                            smoltcp::wire::IpAddress::Ipv4(ipv4) => ipv4.octets()[3] as usize,
-                            _ => 0,
-                        };
-
-                        if !data.is_empty() {
-                            //TODO PROBLEM MIT ID REF
-                            self.deserialize_user_input(player_id, &data);
-                            //kprintln!("Received input from player {}", player_id);
-                        }
-                    }
+                    MessageType::PlayerInput => {}
                     MessageType::GameStateUpdate => {
                         // Client receives game state update from server
                         if !data.is_empty() {
@@ -371,7 +359,7 @@ impl Game {
                                 map_mouse_y: 0,
                             },
                             pointing_to: (0, 0),
-                            color: Color::Green as u8, // TODO: Randomize color
+                            color: player_id, // TODO: Randomize color, based on player right now
                             points: 0,
                             ammo: 1000,
                             last_shot: 0.0,
