@@ -5,30 +5,19 @@ use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 use num_traits::Float;
 
-// #[derive(Clone)]
-// pub(crate) struct PathPoint {
-//     pub(crate) x: f64,
-//     pub(crate) y: f64,
-// }
-
 pub(crate) struct Bullet {
     pub(crate) x: f64,
     pub(crate) y: f64,
     pub(crate) pointing_towards_x: f64,
     pub(crate) pointing_towards_y: f64,
     pub(crate) already_traveled: f64,
-    // pub(crate) path_queue: VecDeque<PathPoint>, // Pre-calculated path points
-    pub(crate) path_queue: VecDeque<(f64, f64)>, // Pre-calculated path points
-    // pub(crate) current_segment_start: PathPoint, // Start of current segment
-    pub(crate) current_segment_start: (f64, f64), // Start of current segment
-                                                  // TODO direkt pfad komplett ausrechnen und speichern?
-                                                  // pro pixel ob x oder/und y colliding -> wenn beide dann 180 grad, wenn nur eins dann spiegeln an wand
-                                                  // immer goto-points bis zu nächsten wand (oder ende des pfades)
-                                                  // -> dann immer delta auf dem phad weiter gehen (float)
+    pub(crate) path_queue: VecDeque<(f64, f64)>,
+    pub(crate) current_segment_start: (f64, f64),
+    pub(crate) shot_by: usize, // Player ID who shot this bullet
 }
 
 impl Bullet {
-    pub fn new(start_x: f64, start_y: f64, target_x: f64, target_y: f64, map: &Map) -> Self {
+    pub fn new(start_x: f64, start_y: f64, target_x: f64, target_y: f64, shot_by: usize, map: &Map) -> Self {
         let mut bullet = Bullet {
             x: start_x,
             y: start_y,
@@ -36,11 +25,11 @@ impl Bullet {
             pointing_towards_y: target_y,
             already_traveled: 0.0,
             path_queue: VecDeque::new(),
-            // current_segment_start: PathPoint { x: start_x, y: start_y },
             current_segment_start: (start_x, start_y),
+            shot_by,
         };
 
-        // Calculate the entire path with reflections
+        // calc entire path with reflections
         bullet.calculate_path(map);
         bullet
     }
@@ -296,43 +285,6 @@ impl Bullet {
                 + (intersection_y - ray_start_y).powi(2))
             .sqrt();
             Some((intersection_x, intersection_y, distance))
-        } else {
-            None
-        }
-    }
-
-    fn ray_line_intersection_old(
-        &self,
-        ray_start_x: f64,
-        ray_start_y: f64,
-        ray_dir_x: f64,
-        ray_dir_y: f64,
-        line_x1: f64,
-        line_y1: f64,
-        line_x2: f64,
-        line_y2: f64,
-    ) -> Option<(f64, f64, f64)> {
-        // Returns: (intersection_x, intersection_y, distance)
-
-        let line_dir_x = line_x2 - line_x1;
-        let line_dir_y = line_y2 - line_y1;
-
-        let denominator = ray_dir_x * line_dir_y - ray_dir_y * line_dir_x;
-
-        if denominator.abs() < 1e-10 {
-            return None; // Lines are parallel
-        }
-
-        let dx = line_x1 - ray_start_x;
-        let dy = line_y1 - ray_start_y;
-
-        let t = (dx * line_dir_y - dy * line_dir_x) / denominator;
-        let u = (dx * ray_dir_y - dy * ray_dir_x) / denominator;
-
-        if t >= 0.0 && u >= 0.0 && u <= 1.0 {
-            let intersection_x = ray_start_x + t * ray_dir_x;
-            let intersection_y = ray_start_y + t * ray_dir_y;
-            Some((intersection_x, intersection_y, t))
         } else {
             None
         }
