@@ -5,9 +5,9 @@ use crate::usr::game::network::{MessageType, NetworkHandler};
 use crate::usr::game::renderer;
 use crate::usr::game::renderer::Color;
 use crate::usr::game::state;
-use crate::usr::game::state::{GUI_WIDTH, Serializable, TICK_RATE, UserInput};
+//use crate::usr::game::state::{GUI_WIDTH, Serializable, TICK_RATE, UserInput};
 use alloc::string::{String, ToString};
-use crate::usr::game::state::{GUI_WIDTH, PLAYER_SIZE, SHOOTING_RATE_PER_SECOND, TICK_RATE};
+use crate::usr::game::state::{GUI_WIDTH, PLAYER_SIZE, Serializable, SHOOTING_RATE_PER_SECOND, TICK_RATE};
 use alloc::vec::Vec;
 use core::hash::Hash;
 use crate::usr::game::bullet::Bullet;
@@ -22,7 +22,7 @@ pub(crate) struct Game {
 
 impl Game {
     pub fn new(width: usize, height: usize) -> Self {
-        let mut map = state::Map::new(width, height, 12, 10, 20); // Example dimensions, adjust as needed
+        let map = Map::new(width, height, 12, 10, 20); // Example dimensions, adjust as needed
         //map.auto_set_walls();
         let game_state = state::GameState::new(map);
         let renderer = renderer::Renderer::new(width, height, 8, 12, 10, 20);
@@ -61,34 +61,8 @@ impl Game {
             }
         }
 
-    pub fn init(&mut self) {
         self.renderer.init();
         self.renderer.draw_map_buffer(self.game_state.map.clone());
-
-        // let pos = self.game_state.map.random_pos();
-        //
-        // // tests
-        // self.game_state.players.push(state::Player {
-        //     id: 1,
-        //     x: pos.0 as f64,
-        //     y: pos.1 as f64,
-        //     alive: true,
-        //     time_of_death: 0.0,
-        //     user_input: state::UserInput {
-        //         up: false,
-        //         right: false,
-        //         down: false,
-        //         left: false,
-        //         shooting: false,
-        //         map_mouse_x: 0,
-        //         map_mouse_y: 0,
-        //     },
-        //     pointing_to: (0, 0),
-        //     color: Color::Blue as u8,
-        //     points: 0,
-        //     ammo: 5,
-        //     last_shot: 0.0,
-        // });
     }
 
     pub fn deinit(&mut self) {
@@ -109,56 +83,57 @@ impl Game {
 
         // update Player positions
         if is_server {
-        for player in &mut self.game_state.players {
-            if player.alive {
-                // new wanted position based on movement direction and tick delta
-                let new_pos = player.next_wanted_position(tick_delta);
-                // TODO check for each pixel on line between current position and new position
-                // check x and y movement separately because example on tablet
-                if !self
-                    .game_state
-                    .map
-                    .is_pos_colliding(player.x as isize, new_pos.1 as isize)
-                {
-                    // move vertically if no collision
-                    player.y = new_pos.1;
-                }
-                if !self
-                    .game_state
-                    .map
-                    .is_pos_colliding(new_pos.0 as isize, player.y as isize)
-                {
-                    // move horizontally if no collision
-                    player.x = new_pos.0;
-                }
-            }
-
-            if player.alive && player.user_input.shooting && player.ammo > 0 {
-                // Check if enough time has passed since last shot (rate limiting)
-                let time_since_last_shot = current_time - player.last_shot;
-                let min_shot_interval = 1.0 / SHOOTING_RATE_PER_SECOND;
-
-                if time_since_last_shot >= min_shot_interval {
-                    // Calculate target position from mouse coordinates
-                    let target_x = (player.user_input.map_mouse_x - GUI_WIDTH as isize) as f64;
-                    let target_y = player.user_input.map_mouse_y as f64;
-
-                    // Spawn bullet
-                    // self.game_state.spawn_bullet(player.id, target_x, target_y);
-                    if player.ammo > 0 {
-                        let bullet = Bullet::new(
-                            player.x + (PLAYER_SIZE as f64 / 2.0), // Center of player
-                            player.y + (PLAYER_SIZE as f64 / 2.0),
-                            target_x,
-                            target_y,
-                            &self.game_state.map,
-                        );
-                        self.game_state.bullets.push(bullet);
+            for player in &mut self.game_state.players {
+                if player.alive {
+                    // new wanted position based on movement direction and tick delta
+                    let new_pos = player.next_wanted_position(tick_delta);
+                    // TODO check for each pixel on line between current position and new position
+                    // check x and y movement separately because example on tablet
+                    if !self
+                        .game_state
+                        .map
+                        .is_pos_colliding(player.x as isize, new_pos.1 as isize)
+                    {
+                        // move vertically if no collision
+                        player.y = new_pos.1;
                     }
+                    if !self
+                        .game_state
+                        .map
+                        .is_pos_colliding(new_pos.0 as isize, player.y as isize)
+                    {
+                        // move horizontally if no collision
+                        player.x = new_pos.0;
+                    }
+                }
 
-                    // Update player state
-                    player.ammo -= 1;
-                    player.last_shot = current_time;
+                if player.alive && player.user_input.shooting && player.ammo > 0 {
+                    // Check if enough time has passed since last shot (rate limiting)
+                    let time_since_last_shot = current_time - player.last_shot;
+                    let min_shot_interval = 1.0 / SHOOTING_RATE_PER_SECOND;
+
+                    if time_since_last_shot >= min_shot_interval {
+                        // Calculate target position from mouse coordinates
+                        let target_x = (player.user_input.map_mouse_x - GUI_WIDTH as isize) as f64;
+                        let target_y = player.user_input.map_mouse_y as f64;
+
+                        // Spawn bullet
+                        // self.game_state.spawn_bullet(player.id, target_x, target_y);
+                        if player.ammo > 0 {
+                            let bullet = Bullet::new(
+                                player.x + (PLAYER_SIZE as f64 / 2.0), // Center of player
+                                player.y + (PLAYER_SIZE as f64 / 2.0),
+                                target_x,
+                                target_y,
+                                &self.game_state.map,
+                            );
+                            self.game_state.bullets.push(bullet);
+                        }
+
+                        // Update player state
+                        player.ammo -= 1;
+                        player.last_shot = current_time;
+                    }
                 }
             }
         } else {
@@ -255,9 +230,10 @@ impl Game {
         }
 
         // Draw mouse cursor
-        let mouse_x = self.game_state.players[0].user_input.map_mouse_x;
-        let mouse_y = self.game_state.players[0].user_input.map_mouse_y;
-        self.renderer.draw_mouse_cursor(mouse_x, mouse_y);
+        // TODO maus muss iwie anders gerendert werden
+        //let mouse_x = self.game_state.players[0].user_input.map_mouse_x;
+        //let mouse_y = self.game_state.players[0].user_input.map_mouse_y;
+        //self.renderer.draw_mouse_cursor(mouse_x, mouse_y);
 
         self.renderer.flush();
     }
@@ -285,7 +261,7 @@ impl Game {
     }
 
     pub fn deserialize_user_input(&mut self, player_id: usize, data: &[u8]) {
-        let user_input = state::UserInput::deserialize(data);
+        let user_input = UserInput::deserialize(data);
         self.set_user_input(player_id, user_input);
     }
 
@@ -304,7 +280,7 @@ impl Game {
     }
 
     pub fn deserialize_map(&mut self, data: &[u8]) {
-        let map = state::Map::deserialize(data);
+        let map = Map::deserialize(data);
         self.set_and_draw_map(map);
     }
 
@@ -314,7 +290,7 @@ impl Game {
                 match msg_type {
                     MessageType::MapData => {
                         if !data.is_empty() {
-                            let received_map = state::Map::deserialize(&data);
+                            let received_map = Map::deserialize(&data);
                             self.set_and_draw_map(received_map);
                             //kprintln!("Client: Map updated from server");
                         }
@@ -362,14 +338,14 @@ impl Game {
                             }
                         }
 
-                        let new_player = state::Player {
+                        let new_player = Player {
                             //id: player_id as usize,
                             id: 0,
                             x: pos.0 as f64,
                             y: pos.1 as f64,
                             alive: true,
                             time_of_death: 0.0,
-                            user_input: state::UserInput {
+                            user_input: UserInput {
                                 up: false,
                                 right: false,
                                 down: false,

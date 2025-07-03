@@ -3,7 +3,7 @@ use crate::api::fs::{FileIO, IO};
 use crate::kprintln;
 use crate::sys::net::socket::SOCKETS;
 use crate::sys::net::socket::udp::UdpSocket;
-use crate::usr::game::state::{Map, Serializable};
+use crate::usr::game::state::{Serializable};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::net::Ipv4Addr;
@@ -14,6 +14,7 @@ use smoltcp::socket::udp;
 use smoltcp::socket::udp::UdpMetadata;
 use smoltcp::wire::{IpAddress, IpCidr};
 use spin::Once;
+use crate::usr::game::map::Map;
 
 const BUFFER_SIZE: usize = 1024;
 
