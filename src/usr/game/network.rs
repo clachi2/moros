@@ -85,13 +85,18 @@ impl NetworkHandler {
 
     pub fn init(&mut self, is_server: bool, ip: Option<&str>) -> Result<(), String> {
         self.is_server = is_server;
-        if self.is_server {
+        if is_server {
             self.set_ip("192.168.0.1").expect("TODO: panic message");
             if self.socket.listen(1234).is_err() {
                 panic!("Failed to set up server socket");
             }
         } else {
-            self.set_ip("192.168.0.2").expect("");
+            // Set client IP if provided
+            if let Some(client_ip) = ip {
+                self.set_ip(client_ip)?;
+                kprintln!("Client IP set to: {}", client_ip);
+            }
+
             if self
                 .socket
                 .connect(IpAddress::from(Ipv4Addr::new(192, 168, 0, 1)), 1234)
@@ -101,7 +106,6 @@ impl NetworkHandler {
             } else {
                 kprintln!("Connected to server");
                 // Send connection request
-                // TODO: Gerde gehen wir davon aus das server schon existiert.. evlt. problem
                 self.send_message_type(MessageType::Connect, &[])?;
             }
         }
@@ -114,15 +118,11 @@ impl NetworkHandler {
     }
 
     pub fn set_ip(&mut self, ip: &str) -> Result<(), String> {
-        if let Ok(ipv4) = Ipv4Addr::from_str(ip) {
-            let addr = IpAddress::from(ipv4);
-            return if fs::write("/dev/net/ip", IpCidr::new(addr, 24).to_string().as_bytes())
-                .is_err()
-            {
-                Err("Failed to set IP address".to_string())
-            } else {
-                Ok(())
-            };
+        let ipv4 = Ipv4Addr::from_str(ip).map_err(|_| "Invalid IP address format".to_string())?;
+        let addr = IpAddress::from(ipv4);
+
+        if fs::write("/dev/net/ip", IpCidr::new(addr, 24).to_string().as_bytes()).is_err() {
+            return Err("Failed to set IP address".to_string());
         }
         if fs::write("/dev/net/gw", b"192.168.0.1").is_err() {
             return Err("Failed to set gateway".to_string());
@@ -213,7 +213,11 @@ impl NetworkHandler {
         match msg_type {
             MessageType::Connect => {
                 // Add client if not already connected
-                if !self.connected_clients.iter().any(|c| c.endpoint == client.endpoint) {
+                if !self
+                    .connected_clients
+                    .iter()
+                    .any(|c| c.endpoint == client.endpoint)
+                {
                     self.connected_clients.push(client);
                     kprintln!("New client connected: {:?}", client.endpoint);
                 }

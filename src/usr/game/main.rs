@@ -21,11 +21,25 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         return help();
     }
     let is_server = args.iter().any(|&arg| arg == "-s" || arg == "--server");
-    //TODO Use this ip later for now client get 0.2
-    let ip = args.iter().find(|&&arg| arg.starts_with("-ip="));
+    // Parse IP argument
+    let client_ip_digit = if let Some(ip_arg) = args.iter().find(|&&arg| arg.starts_with("-ip=")) {
+        if let Some(digit_str) = ip_arg.strip_prefix("-ip=") {
+            match digit_str.parse::<u8>() {
+                Ok(digit) if digit >= 2 && digit <= 255 => Some(digit),
+                _ => {
+                    kprintln!("Invalid IP digit. Must be between 2 and 255.");
+                    return Err(ExitCode::Failure);
+                }
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
 
     let mut game = crate::usr::game::game::Game::new(WIDTH, HEIGHT);
-    game.init(is_server);
+    game.init(is_server, client_ip_digit);
     if is_server {
         kprintln!("Starting game server...");
     } else {
@@ -41,13 +55,11 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     loop {
         // If client, send user input to server
         if !is_server {
-            //TODO auf id setzen
-
             // parse input to game
             let user_input = get_user_input(&mut mouse_x, &mut mouse_y, &mut shooting);
-            game.set_user_input(0, user_input);
+            game.set_user_input(client_ip_digit.unwrap() as usize, user_input);
 
-            if let Err(e) = game.send_user_input_to_server(0) {
+            if let Err(e) = game.send_user_input_to_server(client_ip_digit.unwrap() as usize) {
                 kprintln!("Failed to send user input to server: {}", e);
             }
         }
@@ -88,7 +100,8 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         //     }
         // }
 
-        game.broadcast_game_state_to_clients().expect("TODO: panic message");
+        game.broadcast_game_state_to_clients()
+            .expect("TODO: panic message");
 
         game.draw();
         sys::clk::halt();
@@ -149,8 +162,21 @@ pub fn help() -> Result<(), ExitCode> {
     let csi_title = Style::color("yellow");
     let csi_reset = Style::reset();
     println!(
-        "{}Usage:{} game {}-s|--server -ip[xxx.xxx.xxx.xxx]{}",
+        "{}Usage:{} game {}-s|--server -ip=<digit>{}",
         csi_title, csi_reset, csi_option, csi_reset
     );
+    println!("{}Options:{}", csi_title, csi_reset);
+    println!(
+        "  {}-s, --server{}       Start as server (IP: 192.168.0.1)",
+        csi_option, csi_reset
+    );
+    println!(
+        "  {}-ip=<digit>{}        Set client IP to 192.168.0.<digit> (2-255)",
+        csi_option, csi_reset
+    );
+    println!("{}Examples:{}", csi_title, csi_reset);
+    println!("  game -s                Start server");
+    println!("  game -ip=2             Connect as client with IP 192.168.0.2");
+    println!("  game -ip=3             Connect as client with IP 192.168.0.3");
     Ok(())
 }

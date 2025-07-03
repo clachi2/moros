@@ -9,6 +9,7 @@ use crate::usr::game::state;
 use crate::usr::game::state::{
     GUI_WIDTH, PLAYER_SIZE, SHOOTING_RATE_PER_SECOND, Serializable, TICK_RATE,
 };
+use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
@@ -32,9 +33,15 @@ impl Game {
         }
     }
 
-    pub fn init(&mut self, is_server: bool) {
+    pub fn init(&mut self, is_server: bool, client_ip_digit: Option<u8>) {
+        let client_ip = if let Some(digit) = client_ip_digit {
+            Some(format!("192.168.0.{}", digit))
+        } else {
+            None
+        };
+
         self.network_handler
-            .init(is_server, None)
+            .init(is_server, client_ip.as_deref())
             .expect("Failed to initialize network handler");
         if is_server {
             self.network_handler.set_server();
@@ -250,11 +257,14 @@ impl Game {
     }
 
     pub fn set_user_input(&mut self, player_id: usize, input: UserInput) {
-        if let Some(player) = self.game_state.players.get_mut(player_id) {
-            player.user_input = input;
-        } else {
-            kprintln!("Player with ID {} not found", player_id);
+        for player in &mut self.game_state.players {
+            if player.id == player_id {
+                player.user_input = input;
+                return; // User input set successfully
+            }
         }
+        // If player not found, you might want to handle this case
+        kprintln!("Player with ID {} not found", player_id);
     }
 
     pub fn serialize_user_input(&self) -> Vec<u8> {
@@ -310,7 +320,7 @@ impl Game {
 
                         if !data.is_empty() {
                             //TODO PROBLEM MIT ID REF
-                            self.deserialize_user_input(0, &data);
+                            self.deserialize_user_input(player_id, &data);
                             //kprintln!("Received input from player {}", player_id);
                         }
                     }
@@ -346,7 +356,7 @@ impl Game {
 
                         let new_player = Player {
                             //id: player_id as usize,
-                            id: 0,
+                            id: player_id as usize,
                             x: pos.0 as f64,
                             y: pos.1 as f64,
                             alive: true,
