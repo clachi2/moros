@@ -134,32 +134,6 @@ impl NetworkHandler {
         Ok(())
     }
 
-    // pub fn poll(&mut self) -> Result<(), String> {
-    //     while self.socket.poll(IO::Read){
-    //         if let Ok((size, remote_endpoint)) = {
-    //             let mut sockets = SOCKETS.lock();
-    //             let socket = sockets.get_mut::<udp::Socket>(self.socket.handle);
-    //             socket.recv_slice(&mut *self.buffer).map_err(|_| ())
-    //         } {
-    //             let msg = &self.buffer[..size];
-    //             println!("Received from {:?}: {:?}", remote_endpoint,
-    //                 core::str::from_utf8(msg).unwrap_or("???"));
-    //
-    //             // Prepare response
-    //             let response = format!("Server response to {:?}", remote_endpoint);
-    //
-    //             // Send response back to same endpoint
-    //             if self.socket.poll(IO::Write) {
-    //                 let mut sockets = SOCKETS.lock();
-    //                 let socket = sockets.get_mut::<udp::Socket>(self.socket.handle);
-    //                 socket.send_slice(response.as_bytes(), remote_endpoint).ok();
-    //             }
-    //         }
-    //     }
-    //
-    //     Ok(())
-    // }
-
     pub fn connect(&mut self, ip: &str, port: u16) -> Result<(), String> {
         let addr = IpAddress::from_str(ip).map_err(|_| "Invalid IP address".to_string())?;
         if self.socket.connect(addr, port).is_err() {
@@ -207,6 +181,8 @@ impl NetworkHandler {
                 if size > 0 {
                     if let Some(msg_type) = MessageType::from_u8(self.buffer[0]) {
                         let data = self.buffer[1..size].to_vec();
+
+                        // DEBUG
                         // kprintln!(
                         //     "Received message of type {:?} from {:?}: {:?}",
                         //     msg_type,
@@ -231,17 +207,14 @@ impl NetworkHandler {
     fn handle_server_message(
         &mut self,
         msg_type: MessageType,
+        //TODO evlt brauche ich das noch
         data: &[u8],
         client: UdpMetadata,
     ) -> Result<(), String> {
         match msg_type {
             MessageType::Connect => {
                 // Add client if not already connected
-                if !self
-                    .connected_clients
-                    .iter()
-                    .any(|c| c.endpoint == client.endpoint)
-                {
+                if !self.connected_clients.iter().any(|c| c.endpoint == client.endpoint) {
                     self.connected_clients.push(client);
                     kprintln!("New client connected: {:?}", client.endpoint);
                 }
@@ -297,10 +270,6 @@ impl NetworkHandler {
 
     pub fn send_player_input(&mut self, input_data: &[u8]) -> Result<(), String> {
         self.send_message_type(MessageType::PlayerInput, input_data)
-    }
-
-    pub fn send_game_state(&mut self, state_data: &[u8]) -> Result<(), String> {
-        self.send_message_type(MessageType::GameStateUpdate, state_data)
     }
 
     pub fn broadcast_game_state(&mut self, state_data: &[u8]) -> Result<(), String> {

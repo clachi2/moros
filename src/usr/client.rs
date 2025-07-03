@@ -29,7 +29,6 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         return Err(ExitCode::Failure);
     }
     fs::write("/dev/net/gw", b"192.168.0.1").ok(); // Gateway auf Server-IP ist eine gängige Konfiguration.
-    fs::write("/ini/dns", b"192.168.0.3").is_ok(); // DNS wird nicht benötigt.
 
     let server_port = 1234;
 

@@ -1,15 +1,12 @@
-use crate::api::fs;
-use crate::api::fs::DeviceType::Random;
+
 use crate::sys::clk::boot_time;
 use crate::usr::game::network::{MessageType, NetworkHandler};
 use crate::usr::game::renderer;
 use crate::usr::game::renderer::Color;
 use crate::usr::game::state;
-//use crate::usr::game::state::{GUI_WIDTH, Serializable, TICK_RATE, UserInput};
 use alloc::string::{String, ToString};
 use crate::usr::game::state::{GUI_WIDTH, PLAYER_SIZE, Serializable, SHOOTING_RATE_PER_SECOND, TICK_RATE};
 use alloc::vec::Vec;
-use core::hash::Hash;
 use crate::usr::game::bullet::Bullet;
 use crate::usr::game::map::Map;
 use crate::usr::game::player::{Player, UserInput};
@@ -41,7 +38,7 @@ impl Game {
         if is_server {
             self.network_handler.set_server();
             self.game_state.map.auto_set_walls();
-            // Set the map in network handler so it can be sent to clients
+            // Set the map in network handler, so it can be sent to clients
             self.network_handler.set_map(self.game_state.map.clone());
             kprintln!("Server: Map generated and ready");
         } else {
@@ -230,7 +227,13 @@ impl Game {
         }
 
         // Draw mouse cursor
-        // TODO maus muss iwie anders gerendert werden
+        // TODO maus muss irgendwie anders gerendert werden
+        if !self.game_state.players.is_empty() {
+            let player = &self.game_state.players[0];
+            let mouse_x = player.user_input.map_mouse_x;
+            let mouse_y = player.user_input.map_mouse_y;
+            self.renderer.draw_mouse_cursor(mouse_x, mouse_y);
+        }
         //let mouse_x = self.game_state.players[0].user_input.map_mouse_x;
         //let mouse_y = self.game_state.players[0].user_input.map_mouse_y;
         //self.renderer.draw_mouse_cursor(mouse_x, mouse_y);
@@ -317,7 +320,7 @@ impl Game {
                     }
                     MessageType::Connect => {
                         kprintln!("New client connected: {:?}", sender);
-                        //TODO: neuen spieler erstellen und zum Spiel hinzufügen
+                        //TODO neuen spieler erstellen und zum Spiel hinzufügen
                         let pos = self.game_state.map.random_pos();
                         let player_id = match sender.endpoint.addr {
                             smoltcp::wire::IpAddress::Ipv4(ipv4) => {
@@ -357,7 +360,7 @@ impl Game {
                             pointing_to: (0, 0),
                             color: Color::Green as u8, // TODO: Randomize color
                             points: 0,
-                            ammo: 5,
+                            ammo: 10000,
                             last_shot: 0.0,
                         };
                         self.game_state.players.push(new_player);

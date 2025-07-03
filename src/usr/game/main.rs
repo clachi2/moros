@@ -36,13 +36,14 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     get_mouse_buffer().clear_events();
 
     loop {
-        // parse input to game
-        let user_input = get_user_input(&mut mouse_x, &mut mouse_y, &mut shooting);
-        game.set_user_input(0, user_input);
-
         // If client, send user input to server
         if !is_server {
             //TODO auf id setzen
+
+            // parse input to game
+            let user_input = get_user_input(&mut mouse_x, &mut mouse_y, &mut shooting);
+            game.set_user_input(0, user_input);
+
             if let Err(e) = game.send_user_input_to_server(0) {
                 kprintln!("Failed to send user input to server: {}", e);
             }
