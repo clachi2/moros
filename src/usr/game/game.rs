@@ -8,8 +8,9 @@ use crate::usr::game::renderer::Color;
 use crate::usr::game::state;
 use alloc::format;
 use alloc::string::{String, ToString};
-use crate::usr::game::state::{GUI_WIDTH, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, Serializable, SHOOTING_RATE_PER_SECOND, TICK_RATE};
+use crate::usr::game::state::{GUI_WIDTH, MAX_AMMO, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, Serializable, SHOOTING_RATE_PER_SECOND, TICK_RATE};
 use alloc::vec::Vec;
+use core::char::MAX;
 
 pub(crate) struct Game {
     game_state: state::GameState,
@@ -378,7 +379,7 @@ impl Game {
                             pointing_to: (0, 0),
                             color: player_id, // TODO: Randomize color, based on player right now
                             points: 0,
-                            ammo: 1000,
+                            ammo: MAX_AMMO,
                             last_shot: 0.0,
                         };
                         self.game_state.players.push(new_player);
