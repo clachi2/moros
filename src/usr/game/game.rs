@@ -85,56 +85,56 @@ impl Game {
         self.game_state.last_tick = current_time;
 
         // update Player positions
-        if is_server {
-            for player in &mut self.game_state.players {
-                if player.alive {
-                    // new wanted position based on movement direction and tick delta
-                    let new_pos = player.next_wanted_position(tick_delta);
-                    // TODO check for each pixel on line between current position and new position
-                    // check x and y movement separately because example on tablet
-                    if !self
-                        .game_state
-                        .map
-                        .is_pos_colliding(player.x as isize, new_pos.1 as isize)
-                    {
-                        // move vertically if no collision
-                        player.y = new_pos.1;
-                    }
-                    if !self
-                        .game_state
-                        .map
-                        .is_pos_colliding(new_pos.0 as isize, player.y as isize)
-                    {
-                        // move horizontally if no collision
-                        player.x = new_pos.0;
-                    }
+
+        for player in &mut self.game_state.players {
+            if player.alive {
+                // new wanted position based on movement direction and tick delta
+                let new_pos = player.next_wanted_position(tick_delta);
+                // TODO check for each pixel on line between current position and new position
+                // check x and y movement separately because example on tablet
+                if !self
+                    .game_state
+                    .map
+                    .is_pos_colliding(player.x as isize, new_pos.1 as isize)
+                {
+                    // move vertically if no collision
+                    player.y = new_pos.1;
                 }
+                if !self
+                    .game_state
+                    .map
+                    .is_pos_colliding(new_pos.0 as isize, player.y as isize)
+                {
+                    // move horizontally if no collision
+                    player.x = new_pos.0;
+                }
+            }
 
-                if player.alive && player.user_input.shooting && player.ammo > 0 {
-                    // Check if enough time has passed since last shot (rate limiting)
-                    let time_since_last_shot = current_time - player.last_shot;
-                    let min_shot_interval = 1.0 / SHOOTING_RATE_PER_SECOND;
+            if player.alive && player.user_input.shooting && player.ammo > 0 {
+                // Check if enough time has passed since last shot (rate limiting)
+                let time_since_last_shot = current_time - player.last_shot;
+                let min_shot_interval = 1.0 / SHOOTING_RATE_PER_SECOND;
 
-                    if time_since_last_shot >= min_shot_interval {
-                        let target_x = (player.user_input.map_mouse_x - GUI_WIDTH as isize) as f64;
-                        let target_y = player.user_input.map_mouse_y as f64;
+                if time_since_last_shot >= min_shot_interval {
+                    let target_x = (player.user_input.map_mouse_x - GUI_WIDTH as isize) as f64;
+                    let target_y = player.user_input.map_mouse_y as f64;
 
-                        let bullet = Bullet::new(
-                            player.x + (PLAYER_SIZE as f64 / 2.0), // Center of player
-                            player.y + (PLAYER_SIZE as f64 / 2.0),
-                            target_x,
-                            target_y,
-                            player.id,
-                            &self.game_state.map,
-                        );
-                        self.game_state.bullets.push(bullet);
+                    let bullet = Bullet::new(
+                        player.x + (PLAYER_SIZE as f64 / 2.0), // Center of player
+                        player.y + (PLAYER_SIZE as f64 / 2.0),
+                        target_x,
+                        target_y,
+                        player.id,
+                        &self.game_state.map,
+                    );
+                    self.game_state.bullets.push(bullet);
 
-                        player.ammo -= 1;
-                        player.last_shot = current_time;
-                    }
+                    player.ammo -= 1;
+                    player.last_shot = current_time;
                 }
             }
         }
+
 
         // Update Bullet positions
         self.game_state
@@ -273,7 +273,10 @@ impl Game {
     }
 
     pub fn deserialize_state(&mut self, data: &[u8]) {
+        let last_tick = self.game_state.last_tick;
         self.game_state = state::GameState::deserialize(data);
+        // Restore the last tick time
+        self.game_state.last_tick = last_tick;
         // Update the renderer with the new map
         self.renderer.draw_map_buffer(self.game_state.map.clone());
     }
