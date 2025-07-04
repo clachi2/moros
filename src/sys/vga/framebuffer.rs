@@ -90,15 +90,6 @@ impl Framebuffer {
             y2 = self.height as isize - 1;
         }
 
-
-        // if x1 >= self.width as isize
-        //     || y1 >= self.height as isize
-        //     || x2 >= self.width as isize
-        //     || y2 >= self.height as isize
-        // {
-        //     return;
-        // }
-
         let dx = (x2- x1).abs();
         let dy = (y2- y1).abs();
         let sx = if x1 < x2 { 1 } else { -1 };
@@ -173,7 +164,7 @@ impl Framebuffer {
         text: &str,
         color: u8,
         font: &Font,
-        scale: f32, // z. B. 0.5 für halb, 1.0 für normal
+        scale: f32, // z. B. 0.5 für halb, 1.0 für normal
     ) {
         let mut cursor_x = x as f32;
 

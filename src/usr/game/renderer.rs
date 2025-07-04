@@ -1,7 +1,9 @@
+use crate::api::font::Font;
 use crate::api::fs::write;
 use crate::sys::vga::{VgaPalette, framebuffer};
 use crate::usr::game::map::Map;
-use crate::usr::game::state::{GUI_WIDTH, PLAYER_SIZE};
+use crate::usr::game::state::{GUI_HEIGHT_PER_PLAYER, GUI_WIDTH, MAX_AMMO, PLAYER_SIZE};
+use alloc::format;
 
 pub(crate) enum Color {
     Black = 0x00,
@@ -83,6 +85,10 @@ impl Renderer {
         self.framebuffer.flush();
     }
 
+    pub fn clear(&mut self) {
+        self.framebuffer.clear(Color::LightGray as u8);
+    }
+
     pub fn draw_player(&mut self, x: isize, y: isize, color: u8) {
         for dy in 0..PLAYER_SIZE {
             for dx in 0..PLAYER_SIZE {
@@ -92,13 +98,76 @@ impl Renderer {
         }
     }
 
-    pub fn draw_bullet(&mut self, x : isize, y: isize) {
+    pub fn draw_bullet(&mut self, x: isize, y: isize) {
         // Draw a simple bullet as a small square
         let bullet_color = Color::Yellow as u8; // Yellow color
         for dy in 0..2 {
             for dx in 0..2 {
                 self.framebuffer
                     .draw_pixel(x + dx as isize, y + dy as isize, bullet_color);
+            }
+        }
+    }
+
+    pub fn draw_stat(&mut self, index: usize, player_id: usize, points: usize, ammo: usize) {
+        // Draw 2px outline around the stats
+        let y = (index * GUI_HEIGHT_PER_PLAYER) as isize;
+        self.framebuffer.draw_rectangle(
+            0,
+            y,
+            GUI_WIDTH as isize,
+            y + GUI_HEIGHT_PER_PLAYER as isize - 1,
+            player_id as u8 + 1, // Use player_id as color
+        );
+        self.framebuffer.draw_rectangle(
+            0 + 2,
+            y + 2,
+            GUI_WIDTH as isize - 4,
+            y + GUI_HEIGHT_PER_PLAYER as isize - 1 - 4,
+            Color::LightGray as u8, // Use player_id as color
+        );
+
+        // Draw points
+        let points_text = format!("P:{}", points);
+        let buf = include_bytes!("../../../dsk/ini/fonts/cp857-8x8.psf");
+        let font = Font::try_from(&buf[..]).unwrap();
+        self.framebuffer.draw_text(
+            4,
+            y + 6,
+            &points_text,
+            Color::Black as u8, // Black color for text
+            &font,
+            1.0,
+        );
+
+        let bullet_bitmap = [
+            false, true, true, false, true, false, false, true, true, false, false, true, true,
+            false, false, true, true, false, false, true, true, false, false, true, true, false,
+            false, true, true, false, false, true, true, false, false, true, true, false, false,
+            true, true, false, false, true, true, false, false, true, true, true, true, true,
+        ];
+
+        for i in 0..MAX_AMMO {
+            let bullet_x = GUI_WIDTH as isize - (MAX_AMMO as isize * 5) + (i * 5) as isize - 2;
+            let bullet_y = y + 3;
+            self.framebuffer.draw_bitmap(
+                bullet_x,
+                bullet_y,
+                &bullet_bitmap,
+                4,
+                13,
+                Color::Black as u8,
+                Color::LightGray as u8,
+            );
+            if i < ammo {
+                // filled ammo
+                self.framebuffer.draw_rectangle(
+                    bullet_x + 1,
+                    bullet_y + 1,
+                    2,
+                    11,
+                    player_id as u8 + 1,
+                )
             }
         }
     }
@@ -124,7 +193,7 @@ impl Renderer {
         for y in 0..map.tiles_y as usize {
             for x in 0..map.tiles_x as usize {
                 let tile = map.tiles[y * map.tiles_x + x].clone();
-                let mut line ;
+                let mut line;
                 let x_i = x as isize;
                 let y_i = y as isize;
                 if tile.up {
