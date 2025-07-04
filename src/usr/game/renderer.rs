@@ -116,14 +116,14 @@ impl Renderer {
             0,
             y,
             GUI_WIDTH as isize,
-            y + GUI_HEIGHT_PER_PLAYER as isize - 1,
-            player_id as u8 + 1, // Use player_id as color
+            GUI_HEIGHT_PER_PLAYER as isize,
+            player_id as u8, // Use player_id as color
         );
         self.framebuffer.draw_rectangle(
             0 + 2,
             y + 2,
             GUI_WIDTH as isize - 4,
-            y + GUI_HEIGHT_PER_PLAYER as isize - 1 - 4,
+            GUI_HEIGHT_PER_PLAYER as isize - 4,
             Color::LightGray as u8, // Use player_id as color
         );
 
@@ -161,13 +161,8 @@ impl Renderer {
             );
             if i < ammo {
                 // filled ammo
-                self.framebuffer.draw_rectangle(
-                    bullet_x + 1,
-                    bullet_y + 1,
-                    2,
-                    11,
-                    player_id as u8 + 1,
-                )
+                self.framebuffer
+                    .draw_rectangle(bullet_x + 1, bullet_y + 1, 2, 11, player_id as u8)
             }
         }
     }

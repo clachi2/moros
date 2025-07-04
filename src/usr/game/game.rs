@@ -3,7 +3,6 @@ use crate::usr::game::bullet::Bullet;
 use crate::usr::game::map::Map;
 use crate::usr::game::player::{Player, UserInput};
 use crate::usr::game::renderer;
-use crate::usr::game::renderer::Color;
 use crate::usr::game::state;
 use crate::usr::game::state::{
     GUI_WIDTH, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, SHOOTING_RATE_PER_SECOND,
@@ -36,7 +35,7 @@ impl Game {
 
         // tests
         self.game_state.players.push(Player {
-            id: 0,
+            id: 2,
             x: pos.0 as f64,
             y: pos.1 as f64,
             alive: true,
@@ -51,7 +50,27 @@ impl Game {
                 map_mouse_y: 0,
             },
             pointing_to: (0, 0),
-            color: Color::Blue as u8,
+            points: 0,
+            ammo: 5,
+            last_shot: 0.0,
+        });
+        let pos = self.game_state.map.random_pos();
+        self.game_state.players.push(Player {
+            id: 3,
+            x: pos.0 as f64,
+            y: pos.1 as f64,
+            alive: true,
+            time_of_death: 0.0,
+            user_input: UserInput {
+                up: false,
+                right: false,
+                down: false,
+                left: false,
+                shooting: false,
+                map_mouse_x: 0,
+                map_mouse_y: 0,
+            },
+            pointing_to: (0, 0),
             points: 0,
             ammo: 5,
             last_shot: 0.0,
@@ -139,7 +158,7 @@ impl Game {
             .retain_mut(|bullet| bullet.update(tick_delta));
 
         // Check Collisions between Players and Bullets
-        // self.check_player_bullet_collisions();
+        self.handle_player_bullet_collisions();
 
         // Check if dead players need to respawn
         self.handle_player_respawning(current_time);
@@ -148,6 +167,8 @@ impl Game {
     fn handle_player_bullet_collisions(&mut self) {
         let mut bullets_to_remove = Vec::new();
         // let mut players_to_kill = Vec::new();
+
+        let mut player_ids_to_award = Vec::new();
 
         for (bullet_idx, bullet) in self.game_state.bullets.iter().enumerate() {
             for player in self.game_state.players.iter_mut(){
@@ -162,13 +183,18 @@ impl Game {
                     player.alive = false;
                     player.time_of_death = current_time;
                     player.points = player.points.saturating_sub(POINTS_PER_DEATH_MINUS); // Decrease points on death
-                    if let Some(shot_by) = self.game_state.players.get_mut(bullet.shot_by) {
-                        shot_by.points += POINTS_PER_KILL; // Increase points for the shooter
-                    }
+                    player_ids_to_award.push(bullet.shot_by);
 
                     bullets_to_remove.push(bullet_idx);
                     break; // One bullet can only hit one player
                 }
+            }
+        }
+
+        // Award points to players who shot the bullets that hit players
+        for player in &mut self.game_state.players {
+            if player_ids_to_award.contains(&player.id) {
+                player.points += POINTS_PER_KILL;
             }
         }
 
@@ -205,7 +231,7 @@ impl Game {
                 self.renderer.draw_player(
                     player.x as isize + GUI_WIDTH as isize,
                     player.y as isize,
-                    player.color,
+                    player.id as u8,
                 );
             }
         }
