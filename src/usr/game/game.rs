@@ -382,7 +382,6 @@ impl Game {
                                 map_mouse_y: 0,
                             },
                             pointing_to: (0, 0),
-                            color: player_id, // TODO: Randomize color, based on player right now
                             points: 0,
                             ammo: MAX_AMMO,
                             last_shot: 0.0,

@@ -168,8 +168,6 @@ impl Serializable for Player {
         result.extend_from_slice(&(self.pointing_to.0 as u32).to_le_bytes());
         result.extend_from_slice(&(self.pointing_to.1 as u32).to_le_bytes());
 
-        // Serialize color (1 byte)
-        result.push(self.color);
 
         // Serialize points (4 bytes)
         result.extend_from_slice(&(self.points as u32).to_le_bytes());
@@ -202,7 +200,6 @@ impl Serializable for Player {
                     map_mouse_y: 0,
                 },
                 pointing_to: (0, 0),
-                color: 0,
                 points: 0,
                 ammo: 0,
                 last_shot: 0.0,
@@ -226,11 +223,11 @@ impl Serializable for Player {
 
         let pointing_to_x = u32::from_le_bytes([data[38], data[39], data[40], data[41]]) as usize;
         let pointing_to_y = u32::from_le_bytes([data[42], data[43], data[44], data[45]]) as usize;
-        let color = data[46];
-        let points = u32::from_le_bytes([data[47], data[48], data[49], data[50]]) as usize;
-        let ammo = u32::from_le_bytes([data[51], data[52], data[53], data[54]]) as usize;
+
+        let points = u32::from_le_bytes([data[46], data[47], data[48], data[49]]) as usize;
+        let ammo = u32::from_le_bytes([data[50], data[51], data[52], data[53]]) as usize;
         let last_shot = f64::from_le_bytes([
-            data[55], data[56], data[57], data[58], data[59], data[60], data[61], data[62],
+            data[54], data[55], data[56], data[57], data[58], data[59], data[60], data[61],
         ]);
 
         Player {
@@ -241,7 +238,6 @@ impl Serializable for Player {
             time_of_death,
             user_input,
             pointing_to: (pointing_to_x, pointing_to_y),
-            color,
             points,
             ammo,
             last_shot,
