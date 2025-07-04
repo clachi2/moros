@@ -95,7 +95,6 @@ pub(crate) struct Player {
     pub(crate) time_of_death: f64, // Timestamp of death (get using time::epoch_time())
     pub(crate) user_input: UserInput,
     pub(crate) pointing_to: (usize, usize),
-    pub(crate) color: u8,
     pub(crate) points: usize,
     pub(crate) ammo: usize,
     pub(crate) last_shot: f64, // Timestamp of the last shot (get using time::epoch_time())
@@ -111,7 +110,6 @@ impl Clone for Player {
             time_of_death: self.time_of_death,
             user_input: self.user_input.clone(),
             pointing_to: self.pointing_to,
-            color: self.color,
             points: self.points,
             ammo: self.ammo,
             last_shot: self.last_shot,

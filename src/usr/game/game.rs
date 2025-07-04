@@ -4,7 +4,6 @@ use crate::usr::game::map::Map;
 use crate::usr::game::network::{MessageType, NetworkHandler};
 use crate::usr::game::player::{Player, UserInput};
 use crate::usr::game::renderer;
-use crate::usr::game::renderer::Color;
 use crate::usr::game::state;
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -145,7 +144,6 @@ impl Game {
             }
         }
 
-
         // Update Bullet positions
         self.game_state
             .bullets
@@ -162,6 +160,8 @@ impl Game {
         let mut bullets_to_remove = Vec::new();
         // let mut players_to_kill = Vec::new();
 
+        let mut player_ids_to_award = Vec::new();
+
         for (bullet_idx, bullet) in self.game_state.bullets.iter().enumerate() {
             for player in self.game_state.players.iter_mut(){
                 if player.alive
@@ -175,13 +175,18 @@ impl Game {
                     player.alive = false;
                     player.time_of_death = current_time;
                     player.points = player.points.saturating_sub(POINTS_PER_DEATH_MINUS); // Decrease points on death
-                    if let Some(shot_by) = self.game_state.players.get_mut(bullet.shot_by) {
-                        shot_by.points += POINTS_PER_KILL; // Increase points for the shooter
-                    }
+                    player_ids_to_award.push(bullet.shot_by);
 
                     bullets_to_remove.push(bullet_idx);
                     break; // One bullet can only hit one player
                 }
+            }
+        }
+
+        // Award points to players who shot the bullets that hit players
+        for player in &mut self.game_state.players {
+            if player_ids_to_award.contains(&player.id) {
+                player.points += POINTS_PER_KILL;
             }
         }
 
@@ -218,7 +223,7 @@ impl Game {
                 self.renderer.draw_player(
                     player.x as isize + GUI_WIDTH as isize,
                     player.y as isize,
-                    player.color,
+                    player.id as u8,
                 );
             }
         }
