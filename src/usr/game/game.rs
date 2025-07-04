@@ -53,7 +53,7 @@ impl Game {
             pointing_to: (0, 0),
             color: Color::Blue as u8,
             points: 0,
-            ammo: 100000, // For testing, set high ammo
+            ammo: 5,
             last_shot: 0.0,
         });
     }
@@ -73,8 +73,8 @@ impl Game {
         }
         self.game_state.last_tick = current_time;
 
-        // update Player positions
         for player in &mut self.game_state.players {
+            // update Player positions
             if player.alive {
                 // new wanted position based on movement direction and tick delta
                 let new_pos = player.next_wanted_position(tick_delta);
@@ -98,6 +98,7 @@ impl Game {
                 }
             }
 
+            // Handle Player shooting
             if player.alive && player.user_input.shooting && player.ammo > 0 {
                 // Check if enough time has passed since last shot (rate limiting)
                 let time_since_last_shot = current_time - player.last_shot;
@@ -119,6 +120,15 @@ impl Game {
 
                     player.ammo -= 1;
                     player.last_shot = current_time;
+                }
+            }
+
+            // reload ammo
+            if player.alive && player.ammo < state::MAX_AMMO {
+                let time_since_last_reload = current_time - self.game_state.last_reload_ammo;
+                if time_since_last_reload >= state::RELOAD_TIME {
+                    player.ammo += 1;
+                    self.game_state.last_reload_ammo = current_time;
                 }
             }
         }
@@ -185,8 +195,8 @@ impl Game {
     }
 
     pub fn draw(&mut self) {
-        // TODO draw game state, players, bullets, etc.
-        // Draw map
+        self.renderer.clear();
+
         self.renderer.draw_map();
 
         // Draw players
@@ -204,6 +214,16 @@ impl Game {
         for bullet in &self.game_state.bullets {
             self.renderer
                 .draw_bullet(bullet.x as isize + GUI_WIDTH as isize, bullet.y as isize);
+        }
+
+        // Draw player stats
+        for (index, player) in self.game_state.players.iter().enumerate() {
+            self.renderer.draw_stat(
+                index,
+                player.id,
+                player.points,
+                player.ammo,
+            );
         }
 
         // Draw mouse cursor
