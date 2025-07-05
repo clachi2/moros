@@ -107,62 +107,6 @@ impl Map {
         (x, y)
     }
 
-    pub fn is_pos_colliding(&self, x: isize, y: isize) -> bool {
-        // Convert position to tile coordinates
-        let tile_x = (x / self.tile_size as isize).max(0);
-        let tile_y = (y / self.tile_size as isize).max(0);
-
-        // TODO 4 tiles statt 9 (3x3) -> jeweils in richtung wo player näher dran ist
-        let min_x = tile_x.saturating_sub(1);
-        let max_x = (tile_x + 1).min(self.tiles_x as isize - 1);
-        let min_y = tile_y.saturating_sub(1);
-        let max_y = (tile_y + 1).min(self.tiles_y as isize - 1);
-
-        // Collect all walls from surrounding tiles
-        let mut walls = Vec::new();
-        for y in min_y..=max_y {
-            for x in min_x..=max_x {
-                let index = y * self.tiles_x as isize + x;
-                if index < 0 || index as usize >= self.tiles.len() {
-                    continue; // Skip out of bounds indices
-                }
-                let tile = &self.tiles[index as usize];
-
-                if tile.up {
-                    walls.push(self.wall_coords(x, y, 0))
-                }
-                if tile.right {
-                    walls.push(self.wall_coords(x, y, 1));
-                }
-                if tile.down {
-                    walls.push(self.wall_coords(x, y, 2));
-                }
-                if tile.left {
-                    walls.push(self.wall_coords(x, y, 3));
-                }
-            }
-        }
-
-        // Player's collision lines
-        let l = x;
-        let r = x + PLAYER_SIZE as isize - 1;
-        let t = y;
-        let b = y + PLAYER_SIZE as isize - 1;
-
-        // Check collision with each wall
-        for &(wx1, wy1, wx2, wy2) in &walls {
-            if line_intersects_line(l, t, r, t, wx1, wy1, wx2, wy2)
-                || line_intersects_line(l, b, r, b, wx1, wy1, wx2, wy2)
-                || line_intersects_line(l, t, l, b, wx1, wy1, wx2, wy2)
-                || line_intersects_line(r, t, r, b, wx1, wy1, wx2, wy2)
-            {
-                return true;
-            }
-        }
-
-        false
-    }
-
     pub fn set_outer_walls(&mut self) {
         for x in 0..self.tiles_x {
             self.tiles[x].up = true; // Top row
@@ -341,32 +285,8 @@ impl Map {
             self.flood_fill(x - 1, y, visited, area);
         }
     }
-
 }
 
 fn random_float() -> f32 {
     (get_u64() as f32) / (u64::MAX as f32)
-}
-
-// Helper function to check if two line segments intersect
-fn line_intersects_line(
-    x1: isize,
-    y1: isize,
-    x2: isize,
-    y2: isize,
-    x3: isize,
-    y3: isize,
-    x4: isize,
-    y4: isize,
-) -> bool {
-    let denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
-
-    if denom == 0 {
-        return false; // Lines are parallel
-    }
-
-    let ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) as f64 / denom as f64;
-    let ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) as f64 / denom as f64;
-
-    ua >= 0.0 && ua <= 1.0 && ub >= 0.0 && ub <= 1.0
 }

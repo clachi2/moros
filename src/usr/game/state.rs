@@ -5,6 +5,7 @@ use crate::usr::game::player::Player;
 
 pub static PLAYER_SPEED: f64 = 40.0;
 pub static PLAYER_SIZE: usize = 8;
+pub static RESPAWN_TIME: f64 = 3.0; // in seconds
 
 pub static BULLET_SPEED: f64 = 40.0;
 pub static BULLET_TRAVEL_DIST: f64 = 200.0;
@@ -16,7 +17,7 @@ pub static GUI_WIDTH: usize = 80;
 pub static GUI_HEIGHT_PER_PLAYER: usize = 20;
 
 pub static TICK_RATE: f64 = 64.0;
-pub static WALL_DENSITY: f32 = 0.6;
+pub static WALL_DENSITY: f32 = 0.4;
 pub static POINTS_PER_KILL: usize = 1;
 pub static POINTS_PER_DEATH_MINUS: usize = 0;
 

@@ -1,31 +1,8 @@
-use crate::usr::game::state::{PLAYER_SPEED};
+use crate::usr::game::game::UserInput;
+use crate::usr::game::map::Map;
+use crate::usr::game::state::{PLAYER_SIZE, PLAYER_SPEED};
+use alloc::vec::Vec;
 use num_traits::Float;
-
-pub(crate) struct UserInput {
-    // keyboard input
-    pub(crate) up: bool,
-    pub(crate) right: bool,
-    pub(crate) down: bool,
-    pub(crate) left: bool,
-    // mouse input
-    pub(crate) shooting: bool,
-    pub(crate) map_mouse_x: isize,
-    pub(crate) map_mouse_y: isize,
-}
-
-impl Clone for UserInput {
-    fn clone(&self) -> Self {
-        UserInput {
-            up: self.up,
-            right: self.right,
-            down: self.down,
-            left: self.left,
-            shooting: self.shooting,
-            map_mouse_x: self.map_mouse_x,
-            map_mouse_y: self.map_mouse_y,
-        }
-    }
-}
 
 pub(crate) struct Player {
     pub(crate) id: usize,
@@ -60,7 +37,17 @@ impl Clone for Player {
 }
 
 impl Player {
-    pub fn next_wanted_position(&self, tick_delta: f64) -> (f64, f64) {
+    pub fn update_position(&mut self, tick_delta: f64, map: &Map) {
+        let (next_x, next_y) = self.next_wanted_position(tick_delta);
+        if !self.is_pos_colliding(self.x as isize, next_y as isize, map) {
+            self.y = next_y; // move vertically if no collision
+        }
+        if !self.is_pos_colliding(next_x as isize, self.y as isize, map) {
+            self.x = next_x; // move horizontally if no collision
+        }
+    }
+
+    fn next_wanted_position(&self, tick_delta: f64) -> (f64, f64) {
         let mut delta_x: f64 = 0.0;
         let mut delta_y: f64 = 0.0;
         if self.user_input.up {
@@ -84,4 +71,83 @@ impl Player {
             (self.x, self.y) // No movement
         }
     }
+
+    fn is_pos_colliding(&self, x: isize, y: isize, map: &Map) -> bool {
+        // Convert position to tile coordinates
+        let tile_x = (x / map.tile_size as isize).max(0);
+        let tile_y = (y / map.tile_size as isize).max(0);
+
+        // TODO 4 tiles statt 9 (3x3) -> jeweils in richtung wo player näher dran ist
+        let min_x = tile_x.saturating_sub(1);
+        let max_x = (tile_x + 1).min(map.tiles_x as isize - 1);
+        let min_y = tile_y.saturating_sub(1);
+        let max_y = (tile_y + 1).min(map.tiles_y as isize - 1);
+
+        // Collect all walls from surrounding tiles
+        let mut walls = Vec::new();
+        for y in min_y..=max_y {
+            for x in min_x..=max_x {
+                let index = y * map.tiles_x as isize + x;
+                if index < 0 || index as usize >= map.tiles.len() {
+                    continue; // Skip out of bounds indices
+                }
+                let tile = &map.tiles[index as usize];
+
+                if tile.up {
+                    walls.push(map.wall_coords(x, y, 0))
+                }
+                if tile.right {
+                    walls.push(map.wall_coords(x, y, 1));
+                }
+                if tile.down {
+                    walls.push(map.wall_coords(x, y, 2));
+                }
+                if tile.left {
+                    walls.push(map.wall_coords(x, y, 3));
+                }
+            }
+        }
+
+        // Player's collision lines
+        let l = x;
+        let r = x + PLAYER_SIZE as isize - 1;
+        let t = y;
+        let b = y + PLAYER_SIZE as isize - 1;
+
+        // Check collision with each wall
+        for &(wx1, wy1, wx2, wy2) in &walls {
+            if line_intersects_line(l, t, r, t, wx1, wy1, wx2, wy2)
+                || line_intersects_line(l, b, r, b, wx1, wy1, wx2, wy2)
+                || line_intersects_line(l, t, l, b, wx1, wy1, wx2, wy2)
+                || line_intersects_line(r, t, r, b, wx1, wy1, wx2, wy2)
+            {
+                return true;
+            }
+        }
+
+        false
+    }
+}
+
+// Helper function to check if two line segments intersect
+fn line_intersects_line(
+    x1: isize,
+    y1: isize,
+    x2: isize,
+    y2: isize,
+    x3: isize,
+    y3: isize,
+    x4: isize,
+    y4: isize,
+) -> bool {
+    let denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
+
+    if denom == 0 {
+        return false; // Lines are parallel
+    }
+
+    let ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) as f64 / denom as f64;
+    let ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) as f64 / denom as f64;
+
+    ua >= 0.0 && ua <= 1.0 && ub >= 0.0 && ub <= 1.0
 }
