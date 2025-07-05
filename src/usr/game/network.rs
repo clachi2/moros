@@ -1,33 +1,19 @@
+use alloc::format;
 use crate::api::fs;
 use crate::api::fs::{FileIO, IO};
 use crate::kprintln;
 use crate::sys::net::socket::SOCKETS;
 use crate::sys::net::socket::udp::UdpSocket;
-use crate::usr::game::map::Map;
 use crate::usr::game::state::Serializable;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::net::Ipv4Addr;
 use core::str::FromStr;
-use nolock::queues::mpmc;
-use nolock::queues::mpmc::bounded::scq::{Receiver, Sender};
 use smoltcp::socket::udp;
 use smoltcp::socket::udp::UdpMetadata;
 use smoltcp::wire::{IpAddress, IpCidr};
-use spin::Once;
 
 const BUFFER_SIZE: usize = 8192;
-
-static SENDING_BUFFER: Once<MessageQueue> = Once::new();
-static RECEIVING_BUFFER: Once<MessageQueue> = Once::new();
-
-fn get_sending_buffer() -> &'static MessageQueue {
-    SENDING_BUFFER.call_once(|| MessageQueue::new())
-}
-
-fn get_receiving_buffer() -> &'static MessageQueue {
-    RECEIVING_BUFFER.call_once(|| MessageQueue::new())
-}
 
 #[derive(Debug, Clone)]
 pub enum MessageType {
@@ -69,7 +55,7 @@ pub struct NetworkHandler {
     buffer: [u8; 8192],
     is_server: bool,
     connected_clients: Vec<UdpMetadata>,
-    current_map: Option<Map>,
+    current_map: Vec<u8>,
 }
 
 impl NetworkHandler {
@@ -79,7 +65,7 @@ impl NetworkHandler {
             buffer: [0; 8192],
             is_server: false,
             connected_clients: Vec::new(),
-            current_map: None,
+            current_map: Vec::new(),
         }
     }
 
@@ -106,7 +92,7 @@ impl NetworkHandler {
             } else {
                 kprintln!("Connected to server");
                 // Send connection request
-                // TODO einfach 100 mal schicken gerade .. brauche noch ack
+                // TODO einfach 1000 mal schicken gerade .. brauche noch ack
                 for _ in 0..1000 {
                     self.send_message_type(MessageType::Connect, &[])?;
                 }
@@ -166,9 +152,15 @@ impl NetworkHandler {
         Ok(())
     }
 
-    pub fn send_map(&mut self, map: &Map) -> Result<(), String> {
-        let map_data = map.serialize();
+    pub fn send_map(&mut self) -> Result<(), String> {
+        let map_data = if self.current_map.is_empty() {
+            kprintln!("No map set, sending empty map");
+            Vec::new()
+        } else {
+            self.current_map.clone()
+        };
         self.send_message_type(MessageType::MapData, &map_data)
+            .map_err(|e| format!("Failed to send map: {}", e))
     }
 
     pub fn poll_messages(&mut self) -> Result<Vec<(MessageType, Vec<u8>, UdpMetadata)>, String> {
@@ -184,14 +176,6 @@ impl NetworkHandler {
                     if let Some(msg_type) = MessageType::from_u8(self.buffer[0]) {
                         let data = self.buffer[1..size].to_vec();
 
-                        // DEBUG
-                        // kprintln!(
-                        //     "Received message of type {:?} from {:?}: {:?}",
-                        //     msg_type,
-                        //     remote_endpoint,
-                        //     core::str::from_utf8(&data).unwrap_or("Invalid UTF-8")
-                        // );
-
                         if self.is_server {
                             self.handle_server_message(msg_type.clone(), &data, remote_endpoint)?;
                         }
@@ -205,7 +189,6 @@ impl NetworkHandler {
         Ok(messages)
     }
 
-    //TODO : ist gerade bisschen doppelt aber networkhandler muss wissen an wen er was schickt wenn server
     fn handle_server_message(
         &mut self,
         msg_type: MessageType,
@@ -226,9 +209,10 @@ impl NetworkHandler {
             }
             MessageType::MapRequest => {
                 // Send map to requesting client
-                if let Some(ref map) = self.current_map {
-                    let map_data = map.serialize();
-                    self.send_map_to_client(&map_data, client)?;
+                if !self.current_map.is_empty() {
+                    let map_data = self.current_map.clone();
+                    self.send_map_to_client(&map_data, client)
+                        .map_err(|e| format!("Failed to send map to client: {}", e))?;
                 }
             }
             MessageType::PlayerInput => {
@@ -254,21 +238,27 @@ impl NetworkHandler {
         Ok(())
     }
 
-    pub fn set_map(&mut self, map: Map) {
-        self.current_map = Some(map);
+    pub fn set_map(&mut self, map: Vec<u8>) {
+        self.current_map = map;
     }
 
-    pub fn get_received_map(&mut self) -> Option<Map> {
+    pub fn get_received_map(&mut self) -> Option<Vec<u8>> {
         // Poll for messages and check for map data
         if let Ok(messages) = self.poll_messages() {
             for (msg_type, data, _) in messages {
                 if let MessageType::MapData = msg_type {
                     if !data.is_empty() {
-                        return Some(Map::deserialize(&data));
+                        kprintln!("Received map data of size: {} bytes", data.len());
+                        self.set_map(data.clone());
+                        return Some(data);
+                    } else {
+                        kprintln!("Received empty map data");
                     }
                 }
             }
         }
+        kprintln!("Didnt receive map data, returning current map");
+        // If no map data received, return current map
         None
     }
 
@@ -346,60 +336,5 @@ impl NetworkHandler {
             self.send_game_state_to_client(first_chunk, client)?;
         }
         Ok(())
-    }
-}
-
-pub struct Message {
-    data: [u8; BUFFER_SIZE],
-    size: usize,
-    metadata: UdpMetadata,
-}
-
-pub struct MessageQueue {
-    receiver: Receiver<Message>,
-    sender: Sender<Message>,
-}
-
-impl MessageQueue {
-    pub fn new() -> Self {
-        let (receiver, sender) = mpmc::bounded::scq::queue(BUFFER_SIZE);
-        MessageQueue { receiver, sender }
-    }
-    pub fn push_message(&self, message: Message) {
-        if self.receiver.is_closed() {
-            panic!("MessageQueue is closed!");
-        }
-        if let Err(_) = self.sender.try_enqueue(message) {
-            panic!("MessageQueue is full!");
-        }
-    }
-
-    pub fn get_last_message(&self) -> Option<Message> {
-        if self.receiver.is_closed() {
-            panic!("MessageQueue is closed!");
-        }
-        match self.receiver.try_dequeue() {
-            Ok(message) => Some(message),
-            Err(_) => None,
-        }
-    }
-
-    pub fn wait_for_message(&self) -> Message {
-        if self.receiver.is_closed() {
-            panic!("MessageQueue is closed!");
-        }
-        loop {
-            match self.receiver.try_dequeue() {
-                Ok(message) => return message,
-                Err(_) => {}
-            }
-        }
-    }
-
-    pub fn clear_messages(&self) {
-        if self.receiver.is_closed() {
-            panic!("MessageQueue is closed!");
-        }
-        while let Ok(_) = self.receiver.try_dequeue() {}
     }
 }
