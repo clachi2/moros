@@ -4,6 +4,7 @@ use crate::sys::vga::{VgaPalette, framebuffer};
 use crate::usr::game::map::Map;
 use crate::usr::game::state::{GUI_HEIGHT_PER_PLAYER, GUI_WIDTH, MAX_AMMO, PLAYER_SIZE};
 use alloc::format;
+use alloc::vec::Vec;
 
 pub(crate) enum Color {
     Black = 0x00,
@@ -28,7 +29,7 @@ pub(crate) struct Renderer {
     screen_width: usize,
     screen_height: usize,
     color_depth: u8,
-    framebuffer: framebuffer::Framebuffer,
+    pub(crate) framebuffer: framebuffer::Framebuffer,
     map_buffer: framebuffer::Framebuffer,
     tiles_x: usize,
     tiles_y: usize,
@@ -98,13 +99,12 @@ impl Renderer {
         }
     }
 
-    pub fn draw_bullet(&mut self, x: isize, y: isize) {
+    pub fn draw_bullet(&mut self, x: isize, y: isize, color: u8) {
         // Draw a simple bullet as a small square
-        let bullet_color = Color::Yellow as u8; // Yellow color
         for dy in 0..2 {
             for dx in 0..2 {
                 self.framebuffer
-                    .draw_pixel(x + dx as isize, y + dy as isize, bullet_color);
+                    .draw_pixel(x + dx as isize, y + dy as isize, color);
             }
         }
     }
@@ -174,6 +174,35 @@ impl Renderer {
         self.framebuffer.draw_line(x, y - 4, x, y + 4, cursor_color);
     }
 
+    pub fn draw_areas(&mut self, areas: &Vec<Vec<(usize, usize)>>) {
+        // Draw areas on the map buffer
+        for (i, area) in areas.iter().enumerate() {
+            for &(x, y) in area {
+                let x_pos = x * self.tile_size;
+                let y_pos = y * self.tile_size;
+                self.framebuffer.draw_rectangle(
+                    (x_pos + GUI_WIDTH + 7) as isize,
+                    (y_pos + 7) as isize,
+                    (self.tile_size - 14) as isize,
+                    (self.tile_size - 14) as isize,
+                    (i + 1) as u8,
+                );
+            }
+        }
+    }
+
+    pub fn draw_all_colors(&mut self) {
+        for i in 0..256 {
+            self.framebuffer.draw_line(
+                i,
+                0,
+                i,
+                (self.screen_height - 1) as isize,
+                i as u8, // Use color index as color
+            );
+        }
+    }
+
     pub fn draw_map(&mut self) {
         // write map to framebuffer
         self.framebuffer
@@ -185,8 +214,8 @@ impl Renderer {
         self.map_buffer.clear(Color::LightGray as u8);
 
         // Draw the map tiles
-        for y in 0..map.tiles_y as usize {
-            for x in 0..map.tiles_x as usize {
+        for y in 0..map.tiles_y {
+            for x in 0..map.tiles_x {
                 let tile = map.tiles[y * map.tiles_x + x].clone();
                 let mut line;
                 let x_i = x as isize;

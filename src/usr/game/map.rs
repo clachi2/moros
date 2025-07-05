@@ -3,7 +3,6 @@ use crate::usr::game::state::{PLAYER_SIZE, WALL_DENSITY};
 use alloc::vec;
 use alloc::vec::Vec;
 
-
 pub(crate) struct Direction {
     pub(crate) up: bool,
     pub(crate) right: bool,
@@ -202,41 +201,88 @@ impl Map {
     }
 
     pub fn auto_set_walls(&mut self) {
-        // clear existing walls
-        for y in 0..self.tiles_y {
-            for x in 0..self.tiles_x {
+        self.clear_walls();
+
+        self.add_random_walls(WALL_DENSITY);
+
+        self.set_outer_walls();
+
+        let mut areas = self.find_distinct_areas();
+
+        // Remove walls until only one area remains
+        while areas.len() > 1 {
+            self.remove_one_wall_per_area(&mut areas);
+            areas = self.find_distinct_areas();
+        }
+    }
+
+    fn remove_one_wall_per_area(&mut self, mut areas: &mut Vec<Vec<(usize, usize)>>) {
+        for area in areas.iter().take(areas.len() - 1) {
+            for tile_coord in area {
+                let x = tile_coord.0;
+                let y = tile_coord.1;
                 let index = y * self.tiles_x + x;
-                self.tiles[index] = Direction {
-                    up: false,
-                    right: false,
-                    down: false,
-                    left: false,
-                };
+                let index_right = y * self.tiles_x + (x + 1);
+                let index_down = (y + 1) * self.tiles_x + x;
+                if y > 0
+                    && self.tiles[index].up
+                    && !area.contains(&(tile_coord.0, tile_coord.1 - 1))
+                {
+                    self.tiles[index].up = false;
+                    break;
+                }
+                if x < self.tiles_x - 1
+                    && (self.tiles[index].right || self.tiles[index_right].left)
+                    && !area.contains(&(tile_coord.0 + 1, tile_coord.1))
+                {
+                    self.tiles[index].right = false;
+                    self.tiles[index_right].left = false;
+                    break;
+                }
+                if y < self.tiles_y - 1
+                    && (self.tiles[index].down || self.tiles[index_down].up)
+                    && !area.contains(&(tile_coord.0, tile_coord.1 + 1))
+                {
+                    self.tiles[index].down = false;
+                    self.tiles[index_down].up = false;
+                    break;
+                }
+                if x > 0
+                    && self.tiles[index].left
+                    && !area.contains(&(tile_coord.0 - 1, tile_coord.1))
+                {
+                    self.tiles[index].left = false;
+                    break;
+                }
             }
         }
+    }
 
+    pub(crate) fn clear_walls(&mut self) {
+        for tile in &mut self.tiles {
+            tile.up = false;
+            tile.right = false;
+            tile.down = false;
+            tile.left = false;
+        }
+    }
+
+    pub(crate) fn add_random_walls(&mut self, density: f32) {
         // Add random walls based on the density (only up and left walls to avoid double walls)
         for tile in &mut self.tiles {
-            if random_float() < WALL_DENSITY.clamp(0.0, 1.0) {
+            if random_float() < density.clamp(0.0, 1.0) {
                 tile.up = true;
             }
-            if random_float() < WALL_DENSITY.clamp(0.0, 1.0) {
+            if random_float() < density.clamp(0.0, 1.0) {
                 tile.left = true;
             }
         }
-
-        // Set outer walls
-        self.set_outer_walls();
-
-        // remove closed areas
-        self.ensure_accessible_areas();
     }
 
-    fn ensure_accessible_areas(&mut self) {
+    pub(crate) fn find_distinct_areas(&self) -> Vec<Vec<(usize, usize)>> {
         let mut visited = vec![false; self.tiles_x * self.tiles_y];
         let mut areas = Vec::new();
 
-        // Find all distinct areas
         for y in 0..self.tiles_y {
             for x in 0..self.tiles_x {
                 let index = y * self.tiles_x + x;
@@ -248,25 +294,7 @@ impl Map {
             }
         }
 
-        kprintln!("Found {} distinct areas", areas.len());
-
-        // connect if more than one
-        if areas.len() > 1 {
-            // Sort areas by size (largest first)
-            areas.sort_by(|a, b| b.len().cmp(&a.len()));
-
-            let mut counter = 0;
-            // Connect all smaller areas to the main (largest) area
-            for i in 1..areas.len() {
-                if let Some((x1, y1)) = areas[0].first() {
-                    if let Some((x2, y2)) = areas[i].first() {
-                        counter += 1;
-                        self.connect_areas(*x1, *y1, *x2, *y2);
-                    }
-                }
-            }
-            kprintln!("Connected {} areas", counter);
-        }
+        areas
     }
 
     fn flood_fill(
@@ -314,54 +342,6 @@ impl Map {
         }
     }
 
-    fn connect_areas(&mut self, x1: usize, y1: usize, x2: usize, y2: usize) {
-        // simple pathfinding and remove all walls between two points
-        let mut x = x1;
-        let mut y = y1;
-
-        while x != x2 || y != y2 {
-            // Decide direction to move
-            if x < x2 {
-                // Remove right wall of current tile or left wall of next tile
-                let index = y * self.tiles_x + x;
-                self.tiles[index].right = false;
-                if x < self.tiles_x - 1 {
-                    let next_index = y * self.tiles_x + (x + 1);
-                    self.tiles[next_index].left = false;
-                }
-                x += 1;
-            } else if x > x2 {
-                // Remove left wall of current tile or right wall of next tile
-                let index = y * self.tiles_x + x;
-                self.tiles[index].left = false;
-                if x > 0 {
-                    let next_index = y * self.tiles_x + (x - 1);
-                    self.tiles[next_index].right = false;
-                }
-                x -= 1;
-            }
-
-            if y < y2 {
-                // Remove down wall of current tile or up wall of next tile
-                let index = y * self.tiles_x + x;
-                self.tiles[index].down = false;
-                if y < self.tiles_y - 1 {
-                    let next_index = (y + 1) * self.tiles_x + x;
-                    self.tiles[next_index].up = false;
-                }
-                y += 1;
-            } else if y > y2 {
-                // Remove up wall of current tile or down wall of next tile
-                let index = y * self.tiles_x + x;
-                self.tiles[index].up = false;
-                if y > 0 {
-                    let next_index = (y - 1) * self.tiles_x + x;
-                    self.tiles[next_index].down = false;
-                }
-                y -= 1;
-            }
-        }
-    }
 }
 
 fn random_float() -> f32 {

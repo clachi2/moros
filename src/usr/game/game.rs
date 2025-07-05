@@ -53,6 +53,7 @@ impl Game {
             points: 0,
             ammo: 5,
             last_shot: 0.0,
+            last_reload_ammo: 0.0,
         });
         let pos = self.game_state.map.random_pos();
         self.game_state.players.push(Player {
@@ -74,6 +75,7 @@ impl Game {
             points: 0,
             ammo: 5,
             last_shot: 0.0,
+            last_reload_ammo: 0.0,
         });
     }
 
@@ -115,39 +117,38 @@ impl Game {
                     // move horizontally if no collision
                     player.x = new_pos.0;
                 }
-            }
 
-            // Handle Player shooting
-            if player.alive && player.user_input.shooting && player.ammo > 0 {
-                // Check if enough time has passed since last shot (rate limiting)
-                let time_since_last_shot = current_time - player.last_shot;
-                let min_shot_interval = 1.0 / SHOOTING_RATE_PER_SECOND;
+                // Handle Player shooting
+                if player.user_input.shooting && player.ammo > 0 {
+                    // Check if enough time has passed since last shot (rate limiting)
+                    let time_since_last_shot = current_time - player.last_shot;
+                    let min_shot_interval = 1.0 / SHOOTING_RATE_PER_SECOND;
 
-                if time_since_last_shot >= min_shot_interval {
-                    let target_x = (player.user_input.map_mouse_x - GUI_WIDTH as isize) as f64;
-                    let target_y = player.user_input.map_mouse_y as f64;
+                    if time_since_last_shot >= min_shot_interval {
+                        let target_x = (player.user_input.map_mouse_x - GUI_WIDTH as isize) as f64;
+                        let target_y = player.user_input.map_mouse_y as f64;
 
-                    let bullet = Bullet::new(
-                        player.x + (PLAYER_SIZE as f64 / 2.0), // Center of player
-                        player.y + (PLAYER_SIZE as f64 / 2.0),
-                        target_x,
-                        target_y,
-                        player.id,
-                        &self.game_state.map,
-                    );
-                    self.game_state.bullets.push(bullet);
+                        let bullet = Bullet::new(
+                            player.x + (PLAYER_SIZE as f64 / 2.0), // Center of player
+                            player.y + (PLAYER_SIZE as f64 / 2.0),
+                            target_x,
+                            target_y,
+                            player.id,
+                            &self.game_state.map,
+                        );
+                        self.game_state.bullets.push(bullet);
 
-                    player.ammo -= 1;
-                    player.last_shot = current_time;
+                        player.ammo -= 1;
+                        player.last_shot = current_time;
+                    }
                 }
-            }
-
-            // reload ammo
-            if player.alive && player.ammo < state::MAX_AMMO {
-                let time_since_last_reload = current_time - self.game_state.last_reload_ammo;
-                if time_since_last_reload >= state::RELOAD_TIME {
-                    player.ammo += 1;
-                    self.game_state.last_reload_ammo = current_time;
+                // reload ammo
+                else if player.ammo < state::MAX_AMMO {
+                    let time_since_last_reload = current_time - player.last_reload_ammo;
+                    if time_since_last_reload >= state::RELOAD_TIME {
+                        player.ammo += 1;
+                        player.last_reload_ammo = current_time;
+                    }
                 }
             }
         }
@@ -171,7 +172,7 @@ impl Game {
         let mut player_ids_to_award = Vec::new();
 
         for (bullet_idx, bullet) in self.game_state.bullets.iter().enumerate() {
-            for player in self.game_state.players.iter_mut(){
+            for player in self.game_state.players.iter_mut() {
                 if player.alive
                     && bullet.shot_by != player.id // bullet cant hit its owner
                     && bullet.x < player.x + PLAYER_SIZE as f64
@@ -238,18 +239,17 @@ impl Game {
 
         // Draw bullets
         for bullet in &self.game_state.bullets {
-            self.renderer
-                .draw_bullet(bullet.x as isize + GUI_WIDTH as isize, bullet.y as isize);
+            self.renderer.draw_bullet(
+                bullet.x as isize + GUI_WIDTH as isize,
+                bullet.y as isize,
+                bullet.shot_by as u8,
+            );
         }
 
         // Draw player stats
         for (index, player) in self.game_state.players.iter().enumerate() {
-            self.renderer.draw_stat(
-                index,
-                player.id,
-                player.points,
-                player.ammo,
-            );
+            self.renderer
+                .draw_stat(index, player.id, player.points, player.ammo);
         }
 
         // Draw mouse cursor
