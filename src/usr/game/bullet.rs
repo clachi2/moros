@@ -429,6 +429,7 @@ impl Serializable for Bullet {
             data[offset + 2],
             data[offset + 3],
         ]) as f64;
+        offset += 4;
 
         // Deserialize shot_by (u32 to usize)
         let shot_by = u32::from_le_bytes([
