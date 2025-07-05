@@ -1,13 +1,13 @@
 use crate::sys::clk::boot_time;
 use crate::usr::game::bullet::Bullet;
 use crate::usr::game::map::Map;
-use crate::usr::game::network::{MessageType, NetworkHandler};
 use crate::usr::game::player::{Player, UserInput};
 use crate::usr::game::renderer;
 use crate::usr::game::state;
-use alloc::format;
-use alloc::string::{String, ToString};
-use crate::usr::game::state::{GUI_WIDTH, MAX_AMMO, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, Serializable, SHOOTING_RATE_PER_SECOND, TICK_RATE};
+use crate::usr::game::state::{
+    GUI_WIDTH, MAX_AMMO, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL,
+    SHOOTING_RATE_PER_SECOND, Serializable, TICK_RATE,
+};
 use alloc::vec::Vec;
 
 pub(crate) struct Game {
@@ -38,9 +38,6 @@ impl Game {
     }
 
     pub fn tick(&mut self) {
-        // Handle network messages
-        //self.handle_network_messages();
-
         // Tick timing
         let current_time = boot_time();
         let tick_delta = current_time - self.game_state.last_tick;
@@ -128,7 +125,7 @@ impl Game {
         let mut player_ids_to_award = Vec::new();
 
         for (bullet_idx, bullet) in self.game_state.bullets.iter().enumerate() {
-            for player in self.game_state.players.iter_mut(){
+            for player in self.game_state.players.iter_mut() {
                 if player.alive
                     && bullet.shot_by != player.id // bullet cant hit its owner
                     && bullet.x < player.x + PLAYER_SIZE as f64
@@ -201,12 +198,8 @@ impl Game {
 
         // Draw player stats
         for (index, player) in self.game_state.players.iter().enumerate() {
-            self.renderer.draw_stat(
-                index,
-                player.id,
-                player.points,
-                player.ammo,
-            );
+            self.renderer
+                .draw_stat(index, player.id, player.points, player.ammo);
         }
 
         // Draw mouse cursor
@@ -228,7 +221,10 @@ impl Game {
         // Check if player already exists
         for player in &self.game_state.players {
             if player.id == player_id {
-                kprintln!("Player with ID {} already exists, not adding again", player_id);
+                kprintln!(
+                    "Player with ID {} already exists, not adding again",
+                    player_id
+                );
                 return; // Player already exists, do not add again
             }
         }
@@ -274,15 +270,6 @@ impl Game {
         kprintln!("Player with ID {} not found", player_id);
     }
 
-    pub fn serialize_user_input(&self) -> Vec<u8> {
-        // Get the first player's input (for now)
-        if let Some(player) = self.game_state.players.first() {
-            player.user_input.serialize()
-        } else {
-            Vec::new()
-        }
-    }
-
     pub fn deserialize_user_input(&mut self, player_id: usize, data: &[u8]) {
         let user_input = UserInput::deserialize(data);
         self.set_user_input(player_id, user_input);
@@ -310,117 +297,24 @@ impl Game {
         self.set_and_draw_map(map);
     }
 
-    // fn handle_network_messages(&mut self) {
-    //     if let Ok(messages) = self.network_handler.poll_messages() {
-    //         for (msg_type, data, sender) in messages {
-    //             match msg_type {
-    //                 MessageType::MapData => {
-    //                     if !data.is_empty() {
-    //                         let received_map = Map::deserialize(&data);
-    //                         self.set_and_draw_map(received_map);
-    //                         //kprintln!("Client: Map updated from server");
-    //                     }
-    //                 }
-    //                 MessageType::PlayerInput => {
-    //                     // Extract player ID from sender's IP
-    //                     let player_id = match sender.endpoint.addr {
-    //                         smoltcp::wire::IpAddress::Ipv4(ipv4) => ipv4.octets()[3] as usize,
-    //                         _ => 0,
-    //                     };
-    //
-    //                     if !data.is_empty() {
-    //                         //TODO PROBLEM MIT ID REF
-    //                         self.deserialize_user_input(player_id, &data);
-    //                         //kprintln!("Received input from player {}", player_id);
-    //                     }
-    //                 }
-    //                 MessageType::GameStateUpdate => {
-    //                     // Client receives game state update from server
-    //                     if !data.is_empty() {
-    //                         self.deserialize_state(&data);
-    //                         //kprintln!("Client: Game state updated from server");
-    //                     }
-    //                 }
-    //                 MessageType::Connect => {
-    //                     kprintln!("New client connected: {:?}", sender);
-    //                     //TODO neuen spieler erstellen und zum Spiel hinzufügen
-    //                     let pos = self.game_state.map.random_pos();
-    //                     let player_id = match sender.endpoint.addr {
-    //                         smoltcp::wire::IpAddress::Ipv4(ipv4) => {
-    //                             let octets = ipv4.octets()[3];
-    //                             octets
-    //                         }
-    //
-    //                         _ => 0,
-    //                     };
-    //                     kprintln!("Adding player with ID {} at position {:?}", player_id, pos);
-    //                     for player in &self.game_state.players {
-    //                         if player.id == player_id as usize {
-    //                             kprintln!(
-    //                                 "Player with ID {} already exists, not adding again",
-    //                                 player_id
-    //                             );
-    //                             return; // Player already exists, do not add again
-    //                         }
-    //                     }
-    //
-    //                     let new_player = Player {
-    //                         //id: player_id as usize,
-    //                         id: player_id as usize,
-    //                         x: pos.0 as f64,
-    //                         y: pos.1 as f64,
-    //                         alive: true,
-    //                         time_of_death: 0.0,
-    //                         user_input: UserInput {
-    //                             up: false,
-    //                             right: false,
-    //                             down: false,
-    //                             left: false,
-    //                             shooting: false,
-    //                             map_mouse_x: 0,
-    //                             map_mouse_y: 0,
-    //                         },
-    //                         pointing_to: (0, 0),
-    //                         points: 0,
-    //                         ammo: MAX_AMMO,
-    //                         last_shot: 0.0,
-    //                     };
-    //                     self.game_state.players.push(new_player);
-    //                 }
-    //                 _ => {
-    //                     // Handle other message types as needed
-    //                     //kprintln!("Received message of type {:?} from {:?}", msg_type, sender);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
-    //
-    // pub fn send_user_input_to_server(&mut self, player_id: usize) -> Result<(), String> {
-    //     for player in &self.game_state.players {
-    //         if player.id == player_id {
-    //             let input_data = player.user_input.serialize();
-    //             self.network_handler
-    //                 .send_player_input(&input_data)
-    //                 .expect("TODO: panic message");
-    //             return Ok(());
-    //         }
-    //     }
-    //     Err("Player not found".to_string())
-    // }
-    //
-    // pub fn broadcast_game_state_to_clients(&mut self) -> Result<(), String> {
-    //     let state_data = self.serialize_state();
-    //     // kprintln!(
-    //     //     "Game state size: {} bytes, {} players, {} bullets",
-    //     //     state_data.len(),
-    //     //     self.game_state.players.len(),
-    //     //     self.game_state.bullets.len()
-    //     // );
-    //     self.network_handler.broadcast_game_state(&state_data)
-    // }
-    //
-    // pub fn get_network_handler(&mut self) -> &mut NetworkHandler {
-    //     &mut self.network_handler
-    // }
+    pub fn get_random_spawn_position(&self) -> (usize, usize) {
+        self.game_state.map.random_pos()
+    }
+
+    pub fn serialize_user_input(&self, player_id: usize) -> Vec<u8> {
+        for player in &self.game_state.players {
+            if player.id == player_id {
+                return player.user_input.serialize();
+            }
+        }
+        Vec::new()
+    }
+
+    pub fn get_player_count(&self) -> usize {
+        self.game_state.players.len()
+    }
+
+    pub fn get_bullet_count(&self) -> usize {
+        self.game_state.bullets.len()
+    }
 }

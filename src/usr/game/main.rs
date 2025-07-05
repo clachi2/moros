@@ -1,5 +1,3 @@
-use alloc::format;
-use nom::AsChar;
 use crate::api::console::Style;
 use crate::api::process::ExitCode;
 use crate::kprintln;
@@ -11,6 +9,7 @@ use crate::sys::mouse::get_mouse_buffer;
 use crate::usr::game::map::Map;
 use crate::usr::game::network::{MessageType, NetworkHandler};
 use crate::usr::game::player::UserInput;
+use alloc::format;
 
 //G640x480x16
 const WIDTH: usize = 320;
@@ -52,14 +51,9 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
         kprintln!("No valid arguments provided. Use -s for server or -ip=<digit> for client.");
         return Err(ExitCode::Failure);
     }
-
-    Ok(())
-
-
 }
 
 pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
-
     let mut game = crate::usr::game::game::Game::new(WIDTH, HEIGHT);
     let mut network_handler = NetworkHandler::new();
 
@@ -70,15 +64,18 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
     };
 
     // Initialize network handler
-    network_handler.init(false, client_ip.as_deref())
+    network_handler
+        .init(false, client_ip.as_deref())
         .expect("Initializing network failed");
 
     // Initialize game
     game.init();
 
-    //init a player for the client if he plays "localy"
+    //init a player for the client if he plays "locally"
     //should be deleted if the server sends the player data
     game.add_player(ip_digit.unwrap() as usize);
+    // add a dummy player for testing
+    game.add_player(100);
 
     let mut map_from_server_set = false;
 
@@ -88,6 +85,7 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
     get_mouse_buffer().clear_events();
 
     loop {
+
 
         // Check if the map has been set from the server
         if !map_from_server_set {
@@ -102,13 +100,20 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
             }
         }
 
+        // Handle network messages
+        if let Err(e) = network_handler.handle_network_messages(&mut game) {
+            kprintln!("Failed to handle network messages: {}", e);
+        }
+
         //handle input
         let user_input = get_user_input(&mut mouse_x, &mut mouse_y, &mut shooting);
         game.set_user_input(ip_digit.unwrap() as usize, user_input);
 
-        // if let Err(e) = game.send_user_input_to_server(client_ip_digit.unwrap() as usize) {
-        //     kprintln!("Failed to send user input to server: {}", e);
-        // }
+        // Send user input to server
+        if let Err(e) = network_handler.send_user_input_to_server(&game, ip_digit.unwrap() as usize)
+        {
+            kprintln!("Failed to send user input to server: {}", e);
+        }
 
         console::disable_echo();
         console::enable_raw();
@@ -133,30 +138,24 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
         console::enable_echo();
         console::disable_raw();
 
-        // parse input to game
-        let user_input = get_user_input(&mut mouse_x, &mut mouse_y, &mut shooting);
-        game.set_user_input(ip_digit.unwrap() as usize, user_input);
-
         game.tick();
         game.draw();
 
         sys::clk::halt();
     }
-
-
 }
 
 pub fn server() -> Result<(), ExitCode> {
-
     let mut game = crate::usr::game::game::Game::new(WIDTH, HEIGHT);
     let mut network_handler = NetworkHandler::new();
 
     // Initialize network handler
-    network_handler.init(true, None)
+    network_handler
+        .init(true, None)
         .expect("Initializing network failed");
     network_handler.set_server();
 
-    // Initialize network handler
+    // Initialize game
     game.init();
 
     //network_handler needs map
@@ -165,6 +164,10 @@ pub fn server() -> Result<(), ExitCode> {
     let mut last_broadcast = 0.0;
 
     loop {
+        // Handle network messages
+        if let Err(e) = network_handler.handle_network_messages(&mut game) {
+            kprintln!("Failed to handle network messages: {}", e);
+        }
 
         console::disable_echo();
         console::enable_raw();
@@ -193,13 +196,13 @@ pub fn server() -> Result<(), ExitCode> {
         game.draw();
 
         // Broadcast game state to all clients (rate limited)
-        // let current_time = boot_time();
-        // if current_time - last_broadcast >= 1.0 / BROADCAST_RATE {
-        //     if let Err(e) = game.broadcast_game_state_to_clients() {
-        //         kprintln!("Failed to broadcast game state: {}", e);
-        //     }
-        //     last_broadcast = current_time;
-        // }
+        let current_time = boot_time();
+        if current_time - last_broadcast >= 1.0 / BROADCAST_RATE {
+            if let Err(e) = network_handler.broadcast_game_state_to_clients(&game) {
+                kprintln!("Failed to broadcast game state: {}", e);
+            }
+            last_broadcast = current_time;
+        }
 
         sys::clk::halt();
     }
