@@ -18,7 +18,7 @@ const WIDTH: usize = 320;
 const HEIGHT: usize = 200;
 const SERVER_IP: &str = "192.168.0.1";
 const SERVER_PORT: u16 = 1234;
-const BROADCAST_RATE: f64 = 10.0; // Broadcast rate per second
+const BROADCAST_RATE: f64 = 64.0; // Broadcast rate per second
 
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     if args.iter().any(|&arg| arg == "-h" || arg == "--help") {
@@ -167,7 +167,9 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
     // add a dummy player for testing
     game.add_player(100);
 
-    let mut map_from_server_set = false;
+    let mut set_map_from_server = false;
+    let mut set_player_id = false;
+
 
     let mut mouse_x: i32 = 0;
     let mut mouse_y: i32 = 0;
@@ -176,16 +178,21 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
 
     loop {
         // Check if the map has been set from the server
-        if !map_from_server_set {
+        if !set_map_from_server {
             network_handler
                 .send_message_type(MessageType::MapRequest, &[])
                 .expect("TODO: panic message");
             let received_map = network_handler.get_received_map();
             if let Some(map) = received_map {
                 game.deserialize_map(&map);
-                map_from_server_set = true;
+                set_map_from_server = true;
                 kprintln!("Client: Map received from server!");
             }
+        }
+
+        if !set_player_id {
+            game.set_current_player(ip_digit.unwrap() as usize);
+            set_player_id = true;
         }
 
         // Handle network messages

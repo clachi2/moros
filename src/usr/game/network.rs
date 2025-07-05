@@ -253,12 +253,14 @@ impl NetworkHandler {
                         self.set_map(data.clone());
                         return Some(data);
                     } else {
-                        kprintln!("Received empty map data");
+                        //todo nervt wenn local spielt
+                        //kprintln!("Received empty map data");
                     }
                 }
             }
         }
-        kprintln!("Didnt receive map data, returning current map");
+        //todo nervt wenn local spielt
+        //kprintln!("Didnt receive map data, returning current map");
         // If no map data received, return current map
         None
     }

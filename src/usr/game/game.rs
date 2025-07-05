@@ -202,17 +202,14 @@ impl Game {
                 .draw_stat(index, player.id, player.points, player.ammo);
         }
 
-        // Draw mouse cursor
-        // TODO maus muss irgendwie anders gerendert werden
-        if !self.game_state.players.is_empty() {
-            let player = &self.game_state.players[0]; // Assuming we want to draw the cursor for the first player
+        // Draw mouse cursor for the current player
+        if self.game_state.current_player_index < self.game_state.players.len() {
+            let player = &self.game_state.players[self.game_state.current_player_index];
+            //kprintln!("player id {} with index {}", player.id, self.game_state.current_player_index);
             let mouse_x = player.user_input.map_mouse_x;
             let mouse_y = player.user_input.map_mouse_y;
             self.renderer.draw_mouse_cursor(mouse_x, mouse_y);
         }
-        //let mouse_x = self.game_state.players[0].user_input.map_mouse_x;
-        //let mouse_y = self.game_state.players[0].user_input.map_mouse_y;
-        //self.renderer.draw_mouse_cursor(mouse_x, mouse_y);
 
         self.renderer.flush();
     }
@@ -284,10 +281,15 @@ impl Game {
     }
 
     pub fn deserialize_state(&mut self, data: &[u8]) {
+        //todo anders schicken
         let last_tick = self.game_state.last_tick;
+        let player_index = self.game_state.current_player_index;
+
         self.game_state = state::GameState::deserialize(data);
         // Restore the last tick time
         self.game_state.last_tick = last_tick;
+        // Restore the current player index
+        self.game_state.current_player_index = player_index;
         // Update the renderer with the new map
         self.renderer.draw_map_buffer(self.game_state.map.clone());
     }
@@ -316,5 +318,15 @@ impl Game {
 
     pub fn get_bullet_count(&self) -> usize {
         self.game_state.bullets.len()
+    }
+
+    pub fn set_current_player(&mut self, player_id: usize) {
+        // Find the player index by ID
+        for (index, player) in self.game_state.players.iter().enumerate() {
+            if player.id == player_id {
+                self.game_state.current_player_index = index;
+                break;
+            }
+        }
     }
 }
