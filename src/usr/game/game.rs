@@ -4,10 +4,7 @@ use crate::usr::game::map::Map;
 use crate::usr::game::player::{Player, UserInput};
 use crate::usr::game::renderer;
 use crate::usr::game::state;
-use crate::usr::game::state::{
-    GUI_WIDTH, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, SHOOTING_RATE_PER_SECOND,
-    TICK_RATE,
-};
+use crate::usr::game::state::{GUI_WIDTH, MAX_AMMO, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, Serializable, SHOOTING_RATE_PER_SECOND, TICK_RATE};
 use alloc::vec::Vec;
 
 pub(crate) struct Game {
@@ -249,6 +246,7 @@ impl Game {
             points: 0,
             ammo: MAX_AMMO,
             last_shot: 0.0,
+            last_reload_ammo: 0.0,
         };
         self.game_state.players.push(new_player);
     }

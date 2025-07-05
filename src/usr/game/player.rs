@@ -180,6 +180,9 @@ impl Serializable for Player {
         // Serialize last_shot (8 bytes)
         result.extend_from_slice(&self.last_shot.to_le_bytes());
 
+        // Serialize last_reload_ammo
+        result.extend_from_slice(&self.last_reload_ammo.to_le_bytes());
+
         result
     }
 
@@ -205,6 +208,7 @@ impl Serializable for Player {
                 points: 0,
                 ammo: 0,
                 last_shot: 0.0,
+                last_reload_ammo: 0.0,
             };
         }
 
@@ -231,6 +235,9 @@ impl Serializable for Player {
         let last_shot = f64::from_le_bytes([
             data[54], data[55], data[56], data[57], data[58], data[59], data[60], data[61],
         ]);
+        let last_reload_ammo = f64::from_le_bytes([
+            data[62], data[63], data[64], data[65], data[66], data[67], data[68], data[69],
+        ]);
 
         Player {
             id,
@@ -243,6 +250,7 @@ impl Serializable for Player {
             points,
             ammo,
             last_shot,
+            last_reload_ammo,
         }
     }
 }

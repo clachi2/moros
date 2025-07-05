@@ -64,9 +64,6 @@ impl Serializable for GameState {
         // Serialize last_tick (8 bytes)
         result.extend_from_slice(&self.last_tick.to_le_bytes());
 
-        // Serialize last_reload_ammo (8 bytes)
-        result.extend_from_slice(&self.last_reload_ammo.to_le_bytes());
-
         result
     }
 
@@ -193,21 +190,6 @@ impl Serializable for GameState {
             0.0
         };
 
-        // Deserialize last_reload_ammo
-        let last_reload_ammo = if data.len() >= offset + 8 {
-            f64::from_le_bytes([
-                data[offset],
-                data[offset + 1],
-                data[offset + 2],
-                data[offset + 3],
-                data[offset + 4],
-                data[offset + 5],
-                data[offset + 6],
-                data[offset + 7],
-            ])
-        } else {
-            0.0
-        };
 
         GameState {
             map,
@@ -215,7 +197,6 @@ impl Serializable for GameState {
             bullets,
             current_player_index,
             last_tick,
-            last_reload_ammo,
         }
     }
 }
