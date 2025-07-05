@@ -98,6 +98,7 @@ pub(crate) struct Player {
     pub(crate) points: usize,
     pub(crate) ammo: usize,
     pub(crate) last_shot: f64, // Timestamp of the last shot (get using time::epoch_time())
+    pub(crate) last_reload_ammo: f64, // Timestamp of the last ammo reload
 }
 
 impl Clone for Player {
@@ -113,6 +114,7 @@ impl Clone for Player {
             points: self.points,
             ammo: self.ammo,
             last_shot: self.last_shot,
+            last_reload_ammo: 0.0, // Initialize with a default value
         }
     }
 }

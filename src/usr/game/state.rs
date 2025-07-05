@@ -16,7 +16,7 @@ pub static GUI_WIDTH: usize = 80;
 pub static GUI_HEIGHT_PER_PLAYER: usize = 20;
 
 pub static TICK_RATE: f64 = 64.0;
-pub static WALL_DENSITY: f32 = 0.5;
+pub static WALL_DENSITY: f32 = 0.6;
 pub static POINTS_PER_KILL: usize = 1;
 pub static POINTS_PER_DEATH_MINUS: usize = 0;
 
@@ -31,7 +31,6 @@ pub(crate) struct GameState {
     pub(crate) bullets: Vec<Bullet>,
     pub(crate) current_player_index: usize,
     pub(crate) last_tick: f64, // Timestamp
-    pub(crate) last_reload_ammo: f64, // Timestamp of the last ammo reload
 }
 
 impl Serializable for GameState {
@@ -229,7 +228,6 @@ impl GameState {
             bullets: Vec::new(),
             current_player_index: 0,
             last_tick: 0.0, // Initialize with a default value
-            last_reload_ammo: 0.0, // Initialize with a default value
         }
     }
 }

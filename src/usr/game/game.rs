@@ -5,8 +5,8 @@ use crate::usr::game::player::{Player, UserInput};
 use crate::usr::game::renderer;
 use crate::usr::game::state;
 use crate::usr::game::state::{
-    GUI_WIDTH, MAX_AMMO, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL,
-    SHOOTING_RATE_PER_SECOND, Serializable, TICK_RATE,
+    GUI_WIDTH, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, SHOOTING_RATE_PER_SECOND,
+    TICK_RATE,
 };
 use alloc::vec::Vec;
 
@@ -17,8 +17,8 @@ pub(crate) struct Game {
 
 impl Game {
     pub fn new(width: usize, height: usize) -> Self {
-        let map = Map::new(width, height, 12, 10, 20); // Example dimensions, adjust as needed
-        //map.auto_set_walls();
+        let mut map = Map::new(width, height, 12, 10, 20); // Example dimensions, adjust as needed
+        map.auto_set_walls();
         let game_state = state::GameState::new(map);
         let renderer = renderer::Renderer::new(width, height, 8, 12, 10, 20);
         Game {
@@ -69,39 +69,38 @@ impl Game {
                     // move horizontally if no collision
                     player.x = new_pos.0;
                 }
-            }
 
-            // Handle Player shooting
-            if player.alive && player.user_input.shooting && player.ammo > 0 {
-                // Check if enough time has passed since last shot (rate limiting)
-                let time_since_last_shot = current_time - player.last_shot;
-                let min_shot_interval = 1.0 / SHOOTING_RATE_PER_SECOND;
+                // Handle Player shooting
+                if player.user_input.shooting && player.ammo > 0 {
+                    // Check if enough time has passed since last shot (rate limiting)
+                    let time_since_last_shot = current_time - player.last_shot;
+                    let min_shot_interval = 1.0 / SHOOTING_RATE_PER_SECOND;
 
-                if time_since_last_shot >= min_shot_interval {
-                    let target_x = (player.user_input.map_mouse_x - GUI_WIDTH as isize) as f64;
-                    let target_y = player.user_input.map_mouse_y as f64;
+                    if time_since_last_shot >= min_shot_interval {
+                        let target_x = (player.user_input.map_mouse_x - GUI_WIDTH as isize) as f64;
+                        let target_y = player.user_input.map_mouse_y as f64;
 
-                    let bullet = Bullet::new(
-                        player.x + (PLAYER_SIZE as f64 / 2.0), // Center of player
-                        player.y + (PLAYER_SIZE as f64 / 2.0),
-                        target_x,
-                        target_y,
-                        player.id,
-                        &self.game_state.map,
-                    );
-                    self.game_state.bullets.push(bullet);
+                        let bullet = Bullet::new(
+                            player.x + (PLAYER_SIZE as f64 / 2.0), // Center of player
+                            player.y + (PLAYER_SIZE as f64 / 2.0),
+                            target_x,
+                            target_y,
+                            player.id,
+                            &self.game_state.map,
+                        );
+                        self.game_state.bullets.push(bullet);
 
-                    player.ammo -= 1;
-                    player.last_shot = current_time;
+                        player.ammo -= 1;
+                        player.last_shot = current_time;
+                    }
                 }
-            }
-
-            // reload ammo
-            if player.alive && player.ammo < state::MAX_AMMO {
-                let time_since_last_reload = current_time - self.game_state.last_reload_ammo;
-                if time_since_last_reload >= state::RELOAD_TIME {
-                    player.ammo += 1;
-                    self.game_state.last_reload_ammo = current_time;
+                // reload ammo
+                else if player.ammo < state::MAX_AMMO {
+                    let time_since_last_reload = current_time - player.last_reload_ammo;
+                    if time_since_last_reload >= state::RELOAD_TIME {
+                        player.ammo += 1;
+                        player.last_reload_ammo = current_time;
+                    }
                 }
             }
         }
@@ -192,8 +191,11 @@ impl Game {
 
         // Draw bullets
         for bullet in &self.game_state.bullets {
-            self.renderer
-                .draw_bullet(bullet.x as isize + GUI_WIDTH as isize, bullet.y as isize);
+            self.renderer.draw_bullet(
+                bullet.x as isize + GUI_WIDTH as isize,
+                bullet.y as isize,
+                bullet.shot_by as u8,
+            );
         }
 
         // Draw player stats
