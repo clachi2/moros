@@ -4,7 +4,6 @@ use crate::kprintln;
 use crate::sys::net::socket::SOCKETS;
 use crate::sys::net::socket::udp::UdpSocket;
 
-use crate::usr::game::state::Serializable;
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -13,8 +12,6 @@ use core::str::FromStr;
 use smoltcp::socket::udp;
 use smoltcp::socket::udp::UdpMetadata;
 use smoltcp::wire::{IpAddress, IpCidr};
-use crate::usr::game::game::Game;
-use crate::usr::game::map::Map;
 
 const BUFFER_SIZE: usize = 8192;
 
@@ -340,91 +337,5 @@ impl NetworkHandler {
             self.send_game_state_to_client(first_chunk, client)?;
         }
         Ok(())
-    }
-
-    pub fn handle_network_messages(&mut self, game: &mut Game) -> Result<(), String> {
-        if let Ok(messages) = self.poll_messages() {
-            for (msg_type, data, sender) in messages {
-                match msg_type {
-                    MessageType::MapData => {
-                        if !data.is_empty() {
-                            let received_map = Map::deserialize(&data);
-                            game.set_and_draw_map(received_map);
-                            //kprintln!("Client: Map updated from server");
-                        }
-                    }
-                    MessageType::PlayerInput => {
-                        // Extract player ID from sender's IP
-                        let player_id = match sender.endpoint.addr {
-                            smoltcp::wire::IpAddress::Ipv4(ipv4) => ipv4.octets()[3] as usize,
-                            _ => 0,
-                        };
-
-                        if !data.is_empty() {
-                            game.deserialize_user_input(player_id, &data);
-                            //kprintln!("Received input from player {}", player_id);
-                        }
-                    }
-                    MessageType::GameStateUpdate => {
-                        // Client receives game state update from server
-                        if !data.is_empty() {
-                            game.deserialize_state(&data);
-                            //kprintln!("Client: Game state updated from server");
-                        }
-                    }
-                    MessageType::Connect => {
-                        kprintln!("New client connected: {:?}", sender);
-                        self.handle_new_client_connection(game, sender)?;
-                    }
-                    _ => {
-                        // Handle other message types as needed
-                        //kprintln!("Received message of type {:?} from {:?}", msg_type, sender);
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn handle_new_client_connection(
-        &mut self,
-        game: &mut Game,
-        sender: UdpMetadata,
-    ) -> Result<(), String> {
-        let player_id = match sender.endpoint.addr {
-            smoltcp::wire::IpAddress::Ipv4(ipv4) => {
-                let octets = ipv4.octets()[3];
-                octets
-            }
-            _ => 0,
-        };
-
-        kprintln!("Adding player with ID {} at random position", player_id);
-
-        // Add player to game
-        let player_id = player_id as usize;
-        game.add_player(player_id);
-        Ok(())
-    }
-
-    pub fn send_user_input_to_server(
-        &mut self,
-        game: &Game,
-        player_id: usize,
-    ) -> Result<(), String> {
-        let input_data = game.serialize_user_input(player_id);
-        self.send_player_input(&input_data)
-            .map_err(|e| format!("Failed to send user input: {}", e))
-    }
-
-    pub fn broadcast_game_state_to_clients(&mut self, game: &Game) -> Result<(), String> {
-        let state_data = game.serialize_state();
-        // kprintln!(
-        //     "Game state size: {} bytes, {} players, {} bullets",
-        //     state_data.len(),
-        //     game.get_player_count(),
-        //     game.get_bullet_count()
-        // );
-        self.broadcast_game_state(&state_data)
     }
 }

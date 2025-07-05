@@ -9,7 +9,9 @@ use crate::sys::mouse::get_mouse_buffer;
 use crate::usr::game::map::Map;
 use crate::usr::game::network::{MessageType, NetworkHandler};
 use crate::usr::game::player::UserInput;
+use crate::usr::game::state::Serializable;
 use alloc::format;
+use alloc::string::String;
 
 //G640x480x16
 const WIDTH: usize = 320;
@@ -53,6 +55,94 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     }
 }
 
+fn handle_network_messages(
+    game: &mut crate::usr::game::game::Game,
+    network_handler: &mut NetworkHandler,
+) -> Result<(), String> {
+    if let Ok(messages) = network_handler.poll_messages() {
+        for (msg_type, data, sender) in messages {
+            match msg_type {
+                MessageType::MapData => {
+                    if !data.is_empty() {
+                        let received_map = Map::deserialize(&data);
+                        game.set_and_draw_map(received_map);
+                        //kprintln!("Client: Map updated from server");
+                    }
+                }
+                MessageType::PlayerInput => {
+                    // Extract player ID from sender's IP
+                    let player_id = match sender.endpoint.addr {
+                        smoltcp::wire::IpAddress::Ipv4(ipv4) => ipv4.octets()[3] as usize,
+                        _ => 0,
+                    };
+
+                    if !data.is_empty() {
+                        game.deserialize_user_input(player_id, &data);
+                        //kprintln!("Received input from player {}", player_id);
+                    }
+                }
+                MessageType::GameStateUpdate => {
+                    // Client receives game state update from server
+                    if !data.is_empty() {
+                        game.deserialize_state(&data);
+                        //kprintln!("Client: Game state updated from server");
+                    }
+                }
+                MessageType::Connect => {
+                    kprintln!("New client connected: {:?}", sender);
+                    handle_new_client_connection(game, sender)?;
+                }
+                _ => {
+                    // Handle other message types as needed
+                    //kprintln!("Received message of type {:?} from {:?}", msg_type, sender);
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn handle_new_client_connection(
+    game: &mut crate::usr::game::game::Game,
+    sender: smoltcp::socket::udp::UdpMetadata,
+) -> Result<(), String> {
+    let player_id = match sender.endpoint.addr {
+        smoltcp::wire::IpAddress::Ipv4(ipv4) => {
+            let octets = ipv4.octets()[3];
+            octets
+        }
+        _ => 0,
+    };
+
+    kprintln!("Adding player with ID {} at random position", player_id);
+
+    // Add player to game
+    let player_id = player_id as usize;
+    game.add_player(player_id);
+    Ok(())
+}
+
+fn send_user_input_to_server(
+    game: &crate::usr::game::game::Game,
+    network_handler: &mut NetworkHandler,
+    player_id: usize,
+) -> Result<(), String> {
+    let input_data = game.serialize_user_input(player_id);
+    network_handler
+        .send_player_input(&input_data)
+        .map_err(|e| format!("Failed to send user input: {}", e))
+}
+
+fn broadcast_game_state_to_clients(
+    game: &crate::usr::game::game::Game,
+    network_handler: &mut NetworkHandler,
+) -> Result<(), String> {
+    let state_data = game.serialize_state();
+    network_handler
+        .broadcast_game_state(&state_data)
+        .map_err(|e| format!("Failed to broadcast game state: {}", e))
+}
+
 pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
     let mut game = crate::usr::game::game::Game::new(WIDTH, HEIGHT);
     let mut network_handler = NetworkHandler::new();
@@ -85,8 +175,6 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
     get_mouse_buffer().clear_events();
 
     loop {
-
-
         // Check if the map has been set from the server
         if !map_from_server_set {
             network_handler
@@ -101,7 +189,7 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
         }
 
         // Handle network messages
-        if let Err(e) = network_handler.handle_network_messages(&mut game) {
+        if let Err(e) = handle_network_messages(&mut game, &mut network_handler) {
             kprintln!("Failed to handle network messages: {}", e);
         }
 
@@ -110,7 +198,8 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
         game.set_user_input(ip_digit.unwrap() as usize, user_input);
 
         // Send user input to server
-        if let Err(e) = network_handler.send_user_input_to_server(&game, ip_digit.unwrap() as usize)
+        if let Err(e) =
+            send_user_input_to_server(&game, &mut network_handler, ip_digit.unwrap() as usize)
         {
             kprintln!("Failed to send user input to server: {}", e);
         }
@@ -165,7 +254,7 @@ pub fn server() -> Result<(), ExitCode> {
 
     loop {
         // Handle network messages
-        if let Err(e) = network_handler.handle_network_messages(&mut game) {
+        if let Err(e) = handle_network_messages(&mut game, &mut network_handler) {
             kprintln!("Failed to handle network messages: {}", e);
         }
 
@@ -198,7 +287,7 @@ pub fn server() -> Result<(), ExitCode> {
         // Broadcast game state to all clients (rate limited)
         let current_time = boot_time();
         if current_time - last_broadcast >= 1.0 / BROADCAST_RATE {
-            if let Err(e) = network_handler.broadcast_game_state_to_clients(&game) {
+            if let Err(e) = broadcast_game_state_to_clients(&game, &mut network_handler) {
                 kprintln!("Failed to broadcast game state: {}", e);
             }
             last_broadcast = current_time;
