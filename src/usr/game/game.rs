@@ -207,7 +207,7 @@ impl Game {
             //kprintln!("player id {} with index {}", player.id, self.game_state.current_player_index);
             let mouse_x = player.user_input.map_mouse_x;
             let mouse_y = player.user_input.map_mouse_y;
-            self.renderer.draw_mouse_cursor(mouse_x, mouse_y);
+            self.renderer.draw_mouse_cursor(mouse_x, mouse_y, player.id as u8);
         }
 
         self.renderer.flush();

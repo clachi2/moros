@@ -167,11 +167,11 @@ impl Renderer {
         }
     }
 
-    pub fn draw_mouse_cursor(&mut self, x: isize, y: isize) {
+    pub fn draw_mouse_cursor(&mut self, x: isize, y: isize, color: u8) {
         // Draw a simple crosshair as mouse cursor
-        let cursor_color = Color::Red as u8; // White color
-        self.framebuffer.draw_line(x - 4, y, x + 4, y, cursor_color);
-        self.framebuffer.draw_line(x, y - 4, x, y + 4, cursor_color);
+        //let cursor_color = Color::Red as u8; // White color
+        self.framebuffer.draw_line(x - 4, y, x + 4, y, color);
+        self.framebuffer.draw_line(x, y - 4, x, y + 4, color);
     }
 
     pub fn draw_areas(&mut self, areas: &Vec<Vec<(usize, usize)>>) {
