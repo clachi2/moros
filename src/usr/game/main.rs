@@ -80,7 +80,7 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
     game.add_player(100);
 
     let mut set_map_from_server = false;
-
+    let mut set_player_index = false;
 
     let mut mouse_x: i32 = 0;
     let mut mouse_y: i32 = 0;
@@ -99,6 +99,10 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
                 set_map_from_server = true;
                 kprintln!("Client: Map received from server!");
             }
+        }
+
+        if !set_player_index {
+            game.set_current_player(ip_digit.unwrap() as usize);
         }
 
         // Handle network messages
