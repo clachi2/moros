@@ -1,11 +1,41 @@
 use crate::sys::clk::boot_time;
 use crate::usr::game::bullet::Bullet;
 use crate::usr::game::map::Map;
-use crate::usr::game::player::{Player, UserInput};
+use crate::usr::game::player::Player;
 use crate::usr::game::renderer;
 use crate::usr::game::state;
 use crate::usr::game::state::{GUI_WIDTH, MAX_AMMO, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, Serializable, SHOOTING_RATE_PER_SECOND, TICK_RATE};
+use crate::usr::game::state::{
+    GUI_WIDTH, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, RESPAWN_TIME,
+    SHOOTING_RATE_PER_SECOND, TICK_RATE,
+};
 use alloc::vec::Vec;
+
+pub(crate) struct UserInput {
+    // keyboard input
+    pub(crate) up: bool,
+    pub(crate) right: bool,
+    pub(crate) down: bool,
+    pub(crate) left: bool,
+    // mouse input
+    pub(crate) shooting: bool,
+    pub(crate) map_mouse_x: isize,
+    pub(crate) map_mouse_y: isize,
+}
+
+impl Clone for UserInput {
+    fn clone(&self) -> Self {
+        UserInput {
+            up: self.up,
+            right: self.right,
+            down: self.down,
+            left: self.left,
+            shooting: self.shooting,
+            map_mouse_x: self.map_mouse_x,
+            map_mouse_y: self.map_mouse_y,
+        }
+    }
+}
 
 pub(crate) struct Game {
     game_state: state::GameState,
@@ -14,7 +44,7 @@ pub(crate) struct Game {
 
 impl Game {
     pub fn new(width: usize, height: usize) -> Self {
-        let mut map = Map::new(width, height, 12, 10, 20); // Example dimensions, adjust as needed
+        let mut map = Map::new(width, height, 12, 10, 20);
         map.auto_set_walls();
         let game_state = state::GameState::new(map);
         let renderer = renderer::Renderer::new(width, height, 8, 12, 10, 20);
@@ -43,64 +73,15 @@ impl Game {
         }
         self.game_state.last_tick = current_time;
 
+        // update Player positions
         for player in &mut self.game_state.players {
-            // update Player positions
             if player.alive {
-                // new wanted position based on movement direction and tick delta
-                let new_pos = player.next_wanted_position(tick_delta);
-                // TODO check for each pixel on line between current position and new position
-                // check x and y movement separately because example on tablet
-                if !self
-                    .game_state
-                    .map
-                    .is_pos_colliding(player.x as isize, new_pos.1 as isize)
-                {
-                    // move vertically if no collision
-                    player.y = new_pos.1;
-                }
-                if !self
-                    .game_state
-                    .map
-                    .is_pos_colliding(new_pos.0 as isize, player.y as isize)
-                {
-                    // move horizontally if no collision
-                    player.x = new_pos.0;
-                }
-
-                // Handle Player shooting
-                if player.user_input.shooting && player.ammo > 0 {
-                    // Check if enough time has passed since last shot (rate limiting)
-                    let time_since_last_shot = current_time - player.last_shot;
-                    let min_shot_interval = 1.0 / SHOOTING_RATE_PER_SECOND;
-
-                    if time_since_last_shot >= min_shot_interval {
-                        let target_x = (player.user_input.map_mouse_x - GUI_WIDTH as isize) as f64;
-                        let target_y = player.user_input.map_mouse_y as f64;
-
-                        let bullet = Bullet::new(
-                            player.x + (PLAYER_SIZE as f64 / 2.0), // Center of player
-                            player.y + (PLAYER_SIZE as f64 / 2.0),
-                            target_x,
-                            target_y,
-                            player.id,
-                            &self.game_state.map,
-                        );
-                        self.game_state.bullets.push(bullet);
-
-                        player.ammo -= 1;
-                        player.last_shot = current_time;
-                    }
-                }
-                // reload ammo
-                else if player.ammo < state::MAX_AMMO {
-                    let time_since_last_reload = current_time - player.last_reload_ammo;
-                    if time_since_last_reload >= state::RELOAD_TIME {
-                        player.ammo += 1;
-                        player.last_reload_ammo = current_time;
-                    }
-                }
+                player.update_position(tick_delta, &self.game_state.map);
             }
         }
+
+        // Handle Player shooting
+        self.handle_player_shooting(current_time);
 
         // Update Bullet positions
         self.game_state
@@ -108,16 +89,51 @@ impl Game {
             .retain_mut(|bullet| bullet.update(tick_delta));
 
         // Check Collisions between Players and Bullets
-        self.handle_player_bullet_collisions();
+        self.handle_player_bullet_collisions(current_time);
 
         // Check if dead players need to respawn
         self.handle_player_respawning(current_time);
     }
 
-    fn handle_player_bullet_collisions(&mut self) {
-        let mut bullets_to_remove = Vec::new();
-        // let mut players_to_kill = Vec::new();
+    fn handle_player_shooting(&mut self, current_time: f64) {
+        for player in &mut self.game_state.players {
+            // Handle Player shooting
+            if player.user_input.shooting && player.ammo > 0 {
+                // Check if enough time has passed since last shot (rate limiting)
+                let time_since_last_shot = current_time - player.last_shot;
+                let min_shot_interval = 1.0 / SHOOTING_RATE_PER_SECOND;
 
+                if time_since_last_shot >= min_shot_interval {
+                    let target_x = (player.user_input.map_mouse_x - GUI_WIDTH as isize) as f64;
+                    let target_y = player.user_input.map_mouse_y as f64;
+
+                    let bullet = Bullet::new(
+                        player.x + (PLAYER_SIZE as f64 / 2.0), // Center of player
+                        player.y + (PLAYER_SIZE as f64 / 2.0),
+                        target_x,
+                        target_y,
+                        player.id,
+                        &self.game_state.map,
+                    );
+                    self.game_state.bullets.push(bullet);
+
+                    player.ammo -= 1;
+                    player.last_shot = current_time;
+                }
+            }
+            // reload ammo
+            else if player.ammo < state::MAX_AMMO {
+                let time_since_last_reload = current_time - player.last_reload_ammo;
+                if time_since_last_reload >= state::RELOAD_TIME {
+                    player.ammo += 1;
+                    player.last_reload_ammo = current_time;
+                }
+            }
+        }
+    }
+
+    fn handle_player_bullet_collisions(&mut self, current_time: f64) {
+        let mut bullets_to_remove = Vec::new();
         let mut player_ids_to_award = Vec::new();
 
         for (bullet_idx, bullet) in self.game_state.bullets.iter().enumerate() {
@@ -129,7 +145,6 @@ impl Game {
                     && bullet.y < player.y + PLAYER_SIZE as f64
                     && bullet.y > player.y
                 {
-                    let current_time = boot_time();
                     player.alive = false;
                     player.time_of_death = current_time;
                     player.points = player.points.saturating_sub(POINTS_PER_DEATH_MINUS); // Decrease points on death
@@ -155,10 +170,8 @@ impl Game {
     }
 
     fn handle_player_respawning(&mut self, current_time: f64) {
-        let respawn_time = 3.0; // 3 seconds respawn delay
-
         for player in &mut self.game_state.players {
-            if !player.alive && (current_time - player.time_of_death) >= respawn_time {
+            if !player.alive && (current_time - player.time_of_death) >= RESPAWN_TIME {
                 // Respawn player
                 let pos = self.game_state.map.random_pos();
                 player.x = pos.0 as f64;
