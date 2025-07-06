@@ -8,10 +8,11 @@ use crate::sys::keyboard::{DOWN, LEFT, RIGHT, UP};
 use crate::sys::mouse::get_mouse_buffer;
 use crate::usr::game::map::Map;
 use crate::usr::game::network::{MessageType, NetworkHandler};
-use crate::usr::game::player::UserInput;
 use crate::usr::game::state::{GUI_WIDTH, Serializable, WALL_DENSITY};
 use alloc::format;
 use alloc::string::String;
+use crate::usr::game::game::UserInput;
+use crate::usr::game::renderer;
 use crate::usr::game::renderer::Color;
 
 //G640x480x16

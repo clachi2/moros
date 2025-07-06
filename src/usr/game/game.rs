@@ -4,11 +4,7 @@ use crate::usr::game::map::Map;
 use crate::usr::game::player::Player;
 use crate::usr::game::renderer;
 use crate::usr::game::state;
-use crate::usr::game::state::{GUI_WIDTH, MAX_AMMO, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, Serializable, SHOOTING_RATE_PER_SECOND, TICK_RATE};
-use crate::usr::game::state::{
-    GUI_WIDTH, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, RESPAWN_TIME,
-    SHOOTING_RATE_PER_SECOND, TICK_RATE,
-};
+use crate::usr::game::state::{GUI_WIDTH, MAX_AMMO, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, Serializable, SHOOTING_RATE_PER_SECOND, TICK_RATE, RESPAWN_TIME};
 use alloc::vec::Vec;
 
 pub(crate) struct UserInput {
@@ -33,6 +29,65 @@ impl Clone for UserInput {
             shooting: self.shooting,
             map_mouse_x: self.map_mouse_x,
             map_mouse_y: self.map_mouse_y,
+        }
+    }
+}
+
+impl Serializable for UserInput {
+    fn serialize(&self) -> Vec<u8> {
+        let mut result = Vec::new();
+
+        // Pack boolean inputs into a single byte
+        let mut input_flags = 0u8;
+        if self.up {
+            input_flags |= 0b00001;
+        }
+        if self.right {
+            input_flags |= 0b00010;
+        }
+        if self.down {
+            input_flags |= 0b00100;
+        }
+        if self.left {
+            input_flags |= 0b01000;
+        }
+        if self.shooting {
+            input_flags |= 0b10000;
+        }
+        result.push(input_flags);
+
+        // Serialize mouse coordinates (4 bytes each)
+        result.extend_from_slice(&(self.map_mouse_x as i32).to_le_bytes());
+        result.extend_from_slice(&(self.map_mouse_y as i32).to_le_bytes());
+
+        result
+    }
+
+    fn deserialize(data: &[u8]) -> Self {
+        if data.len() < 9 {
+            return UserInput {
+                up: false,
+                right: false,
+                down: false,
+                left: false,
+                shooting: false,
+                map_mouse_x: 0,
+                map_mouse_y: 0,
+            };
+        }
+
+        let input_flags = data[0];
+        let map_mouse_x = i32::from_le_bytes([data[1], data[2], data[3], data[4]]) as isize;
+        let map_mouse_y = i32::from_le_bytes([data[5], data[6], data[7], data[8]]) as isize;
+
+        UserInput {
+            up: (input_flags & 0b00001) != 0,
+            right: (input_flags & 0b00010) != 0,
+            down: (input_flags & 0b00100) != 0,
+            left: (input_flags & 0b01000) != 0,
+            shooting: (input_flags & 0b10000) != 0,
+            map_mouse_x,
+            map_mouse_y,
         }
     }
 }
