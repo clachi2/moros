@@ -23,6 +23,7 @@ pub enum MessageType {
     PlayerInput,
     GameState,
     GameStateUpdate,
+    Disconnect,
 }
 
 impl MessageType {
@@ -34,6 +35,7 @@ impl MessageType {
             MessageType::PlayerInput => 3,
             MessageType::GameState => 4,
             MessageType::GameStateUpdate => 5,
+            MessageType::Disconnect => 6,
         }
     }
 
@@ -45,6 +47,7 @@ impl MessageType {
             3 => Some(MessageType::PlayerInput),
             4 => Some(MessageType::GameState),
             5 => Some(MessageType::GameStateUpdate),
+            6 => Some(MessageType::Disconnect),
             _ => None,
         }
     }
@@ -52,7 +55,7 @@ impl MessageType {
 
 pub struct NetworkHandler {
     socket: UdpSocket,
-    buffer: [u8; 8192],
+    buffer: [u8; BUFFER_SIZE],
     is_server: bool,
     connected_clients: Vec<UdpMetadata>,
     current_map: Vec<u8>,
@@ -150,17 +153,6 @@ impl NetworkHandler {
             }
         }
         Ok(())
-    }
-
-    pub fn send_map(&mut self) -> Result<(), String> {
-        let map_data = if self.current_map.is_empty() {
-            kprintln!("No map set, sending empty map");
-            Vec::new()
-        } else {
-            self.current_map.clone()
-        };
-        self.send_message_type(MessageType::MapData, &map_data)
-            .map_err(|e| format!("Failed to send map: {}", e))
     }
 
     pub fn poll_messages(&mut self) -> Result<Vec<(MessageType, Vec<u8>, UdpMetadata)>, String> {

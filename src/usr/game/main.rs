@@ -130,6 +130,14 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
             if !stdin.is_empty() {
                 match stdin.remove(0) {
                     'q' => {
+                        //send disconnect message to server
+                        for _ in 0..50 {
+                            // send multiple disconnect messages to ensure server receives it
+                            network_handler.send_message_type(MessageType::Disconnect, &[])
+                                .expect("Failed to send disconnect message");
+                        }
+
+
                         game.deinit();
                         return Ok(());
                     }
@@ -399,6 +407,15 @@ fn handle_network_messages(
                     kprintln!("New client connected: {:?}", sender);
                     handle_new_client_connection(game, sender)?;
                 }
+                MessageType::Disconnect => {
+                    // Extract player ID from sender's IP
+                    let player_id = match sender.endpoint.addr {
+                        smoltcp::wire::IpAddress::Ipv4(ipv4) => ipv4.octets()[3] as usize,
+                        _ => 0,
+                    };
+                    kprintln!("Client disconnected: {}", player_id);
+                    handle_disconnected_client(game, player_id)?;
+                }
                 _ => {
                     // Handle other message types as needed
                     //kprintln!("Received message of type {:?} from {:?}", msg_type, sender);
@@ -426,6 +443,14 @@ fn handle_new_client_connection(
     // Add player to game
     let player_id = player_id as usize;
     game.add_player(player_id);
+    Ok(())
+}
+
+fn handle_disconnected_client(
+    game: &mut crate::usr::game::game::Game,
+    player_id: usize,
+) -> Result<(), String> {
+    game.remove_player(player_id);
     Ok(())
 }
 

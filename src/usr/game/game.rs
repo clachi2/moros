@@ -319,6 +319,17 @@ impl Game {
         self.game_state.players.push(new_player);
     }
 
+    pub fn remove_player(&mut self, player_id: usize) {
+        // Find the player index by ID
+        if let Some(index) = self.game_state.players.iter().position(|p| p.id == player_id) {
+            // Remove the player from the game state
+            self.game_state.players.remove(index);
+            //kprintln!("Player with ID {} removed", player_id);
+        } else {
+            //kprintln!("Player with ID {} not found", player_id);
+        }
+    }
+
     pub fn set_and_draw_map(&mut self, map: Map) {
         self.game_state.map = map.clone();
         self.renderer.draw_map_buffer(map);
