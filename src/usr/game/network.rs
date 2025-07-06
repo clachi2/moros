@@ -207,10 +207,6 @@ impl NetworkHandler {
                         .map_err(|e| format!("Failed to send map to client: {}", e))?;
                 }
             }
-            MessageType::PlayerInput => {
-                // Player input handling is now done in handle_network_messages
-                let _ = data; // Silence unused variable warning
-            }
             _ => {}
         }
         Ok(())

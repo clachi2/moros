@@ -22,6 +22,21 @@ const SERVER_IP: &str = "192.168.0.1";
 const SERVER_PORT: u16 = 1234;
 const BROADCAST_RATE: f64 = 64.0; // Broadcast rate per second
 
+pub static CLIENT_SEND_DELAY: f64 = 0.0;      // 100ms delay
+pub static CLIENT_RECEIVE_DELAY: f64 = 0.00;  // 50ms delay
+pub static SERVER_SEND_DELAY: f64 = 0.00;     // 80ms delay
+pub static SERVER_RECEIVE_DELAY: f64 = 0.2;  // 30ms delay
+pub static DROP_PROBABILITY: f64 = 0.0;       // 10% packet loss
+
+static mut RNG_STATE: u64 = 12345;
+
+fn simple_random() -> f64 {
+    unsafe {
+        RNG_STATE = RNG_STATE.wrapping_mul(1103515245).wrapping_add(12345);
+        (RNG_STATE as f64) / (u64::MAX as f64)
+    }
+}
+
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     if args.iter().any(|&arg| arg == "-h" || arg == "--help") {
         return help();
@@ -374,6 +389,14 @@ fn handle_network_messages(
     game: &mut crate::usr::game::game::Game,
     network_handler: &mut NetworkHandler,
 ) -> Result<(), String> {
+
+
+    let start_time = boot_time();
+    while boot_time() - start_time < CLIENT_RECEIVE_DELAY {
+        // Simple busy wait for delay
+    }
+
+
     if let Ok(messages) = network_handler.poll_messages() {
         for (msg_type, data, sender) in messages {
             match msg_type {
@@ -392,11 +415,36 @@ fn handle_network_messages(
                     };
 
                     if !data.is_empty() {
+                        //simulate receiving delay
+                        let receive_delay = boot_time();
+                        while boot_time() - receive_delay < SERVER_RECEIVE_DELAY {
+                            // busy wait
+                        }
+
+                        //simulate packet loss
+                        if simple_random() < DROP_PROBABILITY {
+                            kprintln!("Simulated packet loss for players input {}", player_id);
+                            continue; // Simulate packet loss
+                        }
+
                         game.deserialize_user_input(player_id, &data);
                         //kprintln!("Received input from player {}", player_id);
                     }
                 }
                 MessageType::GameStateUpdate => {
+                    //simulate receiving delay
+                    let receive_delay = boot_time();
+                    while boot_time() - receive_delay < CLIENT_RECEIVE_DELAY {
+                        // busy wait
+                    }
+
+
+                    //simulate packet loss
+                    if simple_random() < DROP_PROBABILITY {
+                        kprintln!("Simulated packet loss for game state update");
+                        continue; // Simulate packet loss
+                    }
+
                     // Client receives game state update from server
                     if !data.is_empty() {
                         game.deserialize_state(&data);
@@ -459,6 +507,19 @@ fn send_user_input_to_server(
     network_handler: &mut NetworkHandler,
     player_id: usize,
 ) -> Result<(), String> {
+
+    //Simulate packet loss
+    if simple_random() < DROP_PROBABILITY {
+        kprintln!("Simulated packet loss for player {}", player_id);
+        return Ok(()); // Simulate packet loss
+    }
+
+    // Add send delay
+    let start_time = boot_time();
+    while boot_time() - start_time < CLIENT_SEND_DELAY {
+        // busy wait
+    }
+
     let input_data = game.serialize_user_input(player_id);
     network_handler
         .send_player_input(&input_data)
@@ -469,6 +530,19 @@ fn broadcast_game_state_to_clients(
     game: &crate::usr::game::game::Game,
     network_handler: &mut NetworkHandler,
 ) -> Result<(), String> {
+
+    // Simulate packet loss
+    if simple_random() < DROP_PROBABILITY {
+        kprintln!("Simulated packet loss for game state broadcast");
+        return Ok(()); // Simulate packet loss
+    }
+
+    // Add send delay
+    let start_time = boot_time();
+    while boot_time() - start_time < SERVER_SEND_DELAY {
+        //busy wait
+    }
+
     let state_data = game.serialize_state();
     network_handler
         .broadcast_game_state(&state_data)
