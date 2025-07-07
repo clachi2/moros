@@ -214,12 +214,8 @@ impl Map {
     pub(crate) fn add_random_walls(&mut self, density: f32) {
         // Add random walls based on the density (only up and left walls to avoid double walls)
         for tile in &mut self.tiles {
-            if random_float() < density.clamp(0.0, 1.0) {
-                tile.up = true;
-            }
-            if random_float() < density.clamp(0.0, 1.0) {
-                tile.left = true;
-            }
+            tile.up = random_float() < density.clamp(0.0, 1.0);
+            tile.left = random_float() < density.clamp(0.0, 1.0);
         }
     }
 

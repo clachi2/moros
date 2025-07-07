@@ -148,6 +148,10 @@ fn map_demo() {
     renderer.flush();
     wait_until_pressend_and_released();
 
+    renderer.draw_map_buffer(map.clone());
+    renderer.draw_map();
+    renderer.flush();
+    wait_until_pressend_and_released();
 
     renderer.deinit();
 }
