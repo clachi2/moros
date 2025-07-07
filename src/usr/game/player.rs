@@ -39,37 +39,76 @@ impl Clone for Player {
 
 impl Player {
     pub fn update_position(&mut self, tick_delta: f64, map: &Map) {
-        let (next_x, next_y) = self.next_wanted_position(tick_delta);
-        if !self.is_pos_colliding(self.x as isize, next_y as isize, map) {
-            self.y = next_y; // move vertically if no collision
-        }
-        if !self.is_pos_colliding(next_x as isize, self.y as isize, map) {
-            self.x = next_x; // move horizontally if no collision
-        }
-    }
-
-    fn next_wanted_position(&self, tick_delta: f64) -> (f64, f64) {
-        let mut delta_x: f64 = 0.0;
-        let mut delta_y: f64 = 0.0;
-        if self.user_input.up {
-            delta_y -= 1.0;
-        }
-        if self.user_input.down {
-            delta_y += 1.0;
-        }
-        if self.user_input.left {
-            delta_x -= 1.0;
-        }
-        if self.user_input.right {
-            delta_x += 1.0;
-        }
-        // Normalize the direction vector to have length tick_delta * PLAYER_SPEED
-        let length = (delta_x * delta_x + delta_y * delta_y).sqrt();
-        if length > 0.0 {
-            let scale = (tick_delta * PLAYER_SPEED) / length;
-            (self.x + delta_x * scale, self.y + delta_y * scale)
+        let dx = if self.user_input.left {
+            -1.0
+        } else if self.user_input.right {
+            1.0
         } else {
-            (self.x, self.y) // No movement
+            0.0
+        };
+        let dy = if self.user_input.up {
+            -1.0
+        } else if self.user_input.down {
+            1.0
+        } else {
+            0.0
+        };
+        let move_length = tick_delta * PLAYER_SPEED;
+        let mut moved_length = 0.0;
+        loop {
+            let next_x = self.x + dx;
+            let next_y = self.y + dy;
+            let mut moved_x = false;
+            let mut moved_y = false;
+            if !self.is_pos_colliding(next_x as isize, self.y as isize, map) {
+                moved_x = true;
+            }
+            if !self.is_pos_colliding(self.x as isize, next_y as isize, map) {
+                moved_y = true;
+            }
+            if moved_x && moved_y {
+                if moved_length + 2.0.sqrt() <= move_length {
+                    moved_length += 2.0.sqrt();
+                    self.x = next_x; // move horizontally if no collision
+                    self.y = next_y; // move vertically if no collision
+                } else {
+                    break;
+                }
+            } else if moved_x {
+                if moved_length + 1.0 <= move_length {
+                    moved_length += 1.0; // move in one direction
+                    self.x = next_x; // move horizontally if no collision
+                } else {
+                    break;
+                }
+            } else if moved_y {
+                if moved_length + 1.0 <= move_length {
+                    moved_length += 1.0; // move in one direction
+                    self.y = next_y; // move vertically if no collision
+                } else {
+                    break;
+                }
+            } else {
+                break; // stop moving if both directions are blocked
+            }
+        }
+
+        // add rest after comma
+        let rest = (move_length - moved_length).fract();
+        if rest > 0.0 {
+            let length = (dx * dx + dy * dy).sqrt();
+            if length > 0.0 {
+                let scale = rest / length;
+                // Try to move in the direction of the remaining distance
+                let next_x = self.x + dx * scale;
+                let next_y = self.y + dy * scale;
+                if !self.is_pos_colliding(next_x as isize, self.y as isize, map) {
+                    self.x = next_x; // move horizontally if no collision
+                }
+                if !self.is_pos_colliding(self.x as isize, next_y as isize, map) {
+                    self.y = next_y; // move vertically if no collision
+                }
+            }
         }
     }
 

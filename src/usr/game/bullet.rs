@@ -57,7 +57,7 @@ impl Bullet {
         let mut already_traveled = 0.0;
 
         while already_traveled < BULLET_TRAVEL_DIST {
-            if let Some((col_x, col_y, norm_x, norm_y, dist)) =
+            if let Some((col_x, col_y, new_dir_x, new_dir_y, dist)) =
                 self.find_next_collision(current_x, current_y, direction_x, direction_y, map)
             {
                 if already_traveled + dist >= BULLET_TRAVEL_DIST {
@@ -76,10 +76,8 @@ impl Bullet {
 
                 already_traveled += dist;
 
-                // calc reflection
-                let dot = direction_x * norm_x + direction_y * norm_y;
-                direction_x -= 2.0 * dot * norm_x;
-                direction_y -= 2.0 * dot * norm_y;
+                direction_x = new_dir_x;
+                direction_y = new_dir_y;
             } else {
                 // no collision found
                 let remaining_dist = BULLET_TRAVEL_DIST - already_traveled;
@@ -118,7 +116,7 @@ impl Bullet {
         dir_y: f64,
         map: &Map,
     ) -> Option<(f64, f64, f64, f64, f64)> {
-        // (col_x, col_y, norm_x, norm_y, distance)
+        // (col_x, col_y, dir_x,dir_y, distance)
 
         let mut ret: Option<(f64, f64, f64, f64, f64)> = None;
         let mut min_dist = f64::INFINITY;
@@ -179,9 +177,21 @@ impl Bullet {
                 dir_x,
                 dir_y
             );
+            None
         }
-
-        ret
+        else {
+            let dot = dir_x * ret.unwrap().2 + dir_y * ret.unwrap().3;
+            let new_dir_x = dir_x - 2.0 * dot * ret.unwrap().2;
+            let new_dir_y = dir_y - 2.0 * dot * ret.unwrap().3;
+            ret = Some((
+                ret.unwrap().0,
+                ret.unwrap().1,
+                new_dir_x,
+                new_dir_y,
+                ret.unwrap().4,
+            ));
+            ret
+        }
     }
 
     fn get_tiles_on_ray(
@@ -300,7 +310,7 @@ impl Bullet {
     pub fn update(&mut self, tick_delta: f64) -> bool {
         // Returns false if bullet should be remove
 
-        let travel_distance = tick_delta * BULLET_SPEED;
+        let mut travel_distance = tick_delta * BULLET_SPEED;
 
         loop {
             // Calculate distance to current target
@@ -331,8 +341,8 @@ impl Bullet {
                     self.pointing_towards_y = next_point.1;
 
                     // Continue with remaining travel distance
-                    let remaining_travel = travel_distance - distance_to_target;
-                    if remaining_travel <= 0.001 {
+                    travel_distance -= distance_to_target;
+                    if travel_distance <= 0.001 {
                         // Small epsilon
                         return self.already_traveled < BULLET_TRAVEL_DIST;
                     }
