@@ -1,12 +1,12 @@
 use crate::api::font::Font;
 use crate::api::fs::write;
 use crate::sys::vga::{VgaPalette, framebuffer};
-use crate::usr::game::map::Map;
-use crate::usr::game::state::{GUI_HEIGHT_PER_PLAYER, GUI_WIDTH, MAX_AMMO, PLAYER_SIZE};
+use crate::usr::game::tanks::map::Map;
+use crate::usr::game::tanks::state::{GUI_HEIGHT_PER_PLAYER, GUI_WIDTH, MAX_AMMO, PLAYER_SIZE};
 use alloc::format;
 use alloc::vec::Vec;
 
-pub(crate) enum Color {
+pub enum Color {
     Black = 0x00,
     Blue = 0x01,
     Green = 0x02,
@@ -25,11 +25,11 @@ pub(crate) enum Color {
     White = 0x0F,
 }
 
-pub(crate) struct Renderer {
+pub struct Renderer {
     screen_width: usize,
     screen_height: usize,
     color_depth: u8,
-    pub(crate) framebuffer: framebuffer::Framebuffer,
+    pub framebuffer: framebuffer::Framebuffer,
     map_buffer: framebuffer::Framebuffer,
     tiles_x: usize,
     tiles_y: usize,
@@ -129,7 +129,7 @@ impl Renderer {
 
         // Draw points
         let points_text = format!("P:{}", points);
-        let buf = include_bytes!("../../../dsk/ini/fonts/cp857-8x8.psf");
+        let buf = include_bytes!("../../../../dsk/ini/fonts/cp857-8x8.psf");
         let font = Font::try_from(&buf[..]).unwrap();
         self.framebuffer.draw_text(
             4,

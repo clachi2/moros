@@ -4,17 +4,12 @@ use crate::kprintln;
 use crate::sys;
 use crate::sys::clk::boot_time;
 use crate::sys::console;
-use crate::sys::keyboard::{DOWN, LEFT, RIGHT, UP};
 use crate::sys::mouse::get_mouse_buffer;
-use crate::usr::game::map::Map;
 use crate::usr::game::network::{MessageType, NetworkHandler};
-use crate::usr::game::state::{GUI_WIDTH, Serializable, WALL_DENSITY};
+use crate::usr::game::tanks::game::map_demo;
+// use crate::usr::game::tanks::map::Map;
 use alloc::format;
 use alloc::string::String;
-use crate::sys::process::user;
-use crate::usr::game::game::UserInput;
-use crate::usr::game::renderer;
-use crate::usr::game::renderer::Color;
 
 //G640x480x16
 const WIDTH: usize = 320;
@@ -23,11 +18,11 @@ const SERVER_IP: &str = "192.168.0.1";
 const SERVER_PORT: u16 = 1234;
 const BROADCAST_RATE: f64 = 64.0; // Broadcast rate per second
 
-pub static CLIENT_SEND_DELAY: f64 = 0.0;      // 100ms delay
-pub static CLIENT_RECEIVE_DELAY: f64 = 0.0;  // 50ms delay
-pub static SERVER_SEND_DELAY: f64 = 0.0;     // 80ms delay
-pub static SERVER_RECEIVE_DELAY: f64 = 0.0;   // 30ms delay
-pub static DROP_PROBABILITY: f64 = 0.0;       // 10% packet loss
+pub static CLIENT_SEND_DELAY: f64 = 0.0; // 100ms delay
+pub static CLIENT_RECEIVE_DELAY: f64 = 0.0; // 50ms delay
+pub static SERVER_SEND_DELAY: f64 = 0.0; // 80ms delay
+pub static SERVER_RECEIVE_DELAY: f64 = 0.0; // 30ms delay
+pub static DROP_PROBABILITY: f64 = 0.0; // 10% packet loss
 
 static mut RNG_STATE: u64 = 12345;
 
@@ -41,6 +36,9 @@ fn simple_random() -> f64 {
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     if args.iter().any(|&arg| arg == "-h" || arg == "--help") {
         return help();
+    }
+    if args.iter().any(|&arg| arg == "-m" || arg == "--mapdemo") {
+        return map_demo(WIDTH, HEIGHT);
     }
     let is_server = args.iter().any(|&arg| arg == "-s" || arg == "--server");
 
@@ -74,7 +72,7 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
 }
 
 pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
-    let mut game = crate::usr::game::game::Game::new(WIDTH, HEIGHT);
+    let mut game = crate::usr::game::tanks::game::Game::new(WIDTH, HEIGHT);
     let mut network_handler = NetworkHandler::new();
 
     let client_ip = if let Some(digit) = ip_digit {
@@ -131,20 +129,11 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
         }
 
         //handle input
-        let user_input = get_user_input(&mut mouse_x, &mut mouse_y, &mut shooting);
-        game.set_user_input(ip_digit.unwrap() as usize, user_input);
-
-        // let rand = simple_random();
-        //
-        // game.set_user_input(10usize, UserInput {
-        //     up: rand < 0.1,
-        //     down: rand >= 0.5 && rand < 0.6,
-        //     left: rand >= 0.7 && rand < 0.8,
-        //     right: rand >= 0.9,
-        //     shooting: false, // No shooting for dummy player
-        //     map_mouse_x: mouse_x as isize,
-        //     map_mouse_y: mouse_y as isize,
-        // });
+        // let user_input = get_user_input(&mut mouse_x, &mut mouse_y, &mut shooting);
+        // let user_input =
+        //     UserInput::get_next_input(&mut mouse_x, &mut mouse_y, &mut shooting, WIDTH, HEIGHT);
+        // game.set_user_input(ip_digit.unwrap() as usize, user_input);
+        game.update_user_input(ip_digit.unwrap() as usize, WIDTH, HEIGHT);
 
         // Send user input to server
         if let Err(e) =
@@ -163,19 +152,17 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
                         //send disconnect message to server
                         for _ in 0..50 {
                             // send multiple disconnect messages to ensure server receives it
-                            network_handler.send_message_type(MessageType::Disconnect, &[])
+                            network_handler
+                                .send_message_type(MessageType::Disconnect, &[])
                                 .expect("Failed to send disconnect message");
                         }
-
 
                         game.deinit();
                         return Ok(());
                     }
                     'y' => {
                         // TODO remove this, just for testing
-                        let mut map = Map::new(320, 200, 12, 10, 20);
-                        map.auto_set_walls();
-                        game.set_and_draw_map(map);
+                        game.set_new_random_map(WIDTH, HEIGHT);
                     }
                     _ => {}
                 }
@@ -192,7 +179,7 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
 }
 
 pub fn server() -> Result<(), ExitCode> {
-    let mut game = crate::usr::game::game::Game::new(WIDTH, HEIGHT);
+    let mut game = crate::usr::game::tanks::game::Game::new(WIDTH, HEIGHT);
     let mut network_handler = NetworkHandler::new();
 
     // Initialize network handler
@@ -226,10 +213,7 @@ pub fn server() -> Result<(), ExitCode> {
                         return Ok(());
                     }
                     'y' => {
-                        // TODO remove this, just for testing
-                        let mut map = Map::new(320, 200, 12, 10, 20);
-                        map.auto_set_walls();
-                        game.set_and_draw_map(map);
+                        game.set_new_random_map(WIDTH, HEIGHT);
                     }
                     _ => {}
                 }
@@ -254,168 +238,16 @@ pub fn server() -> Result<(), ExitCode> {
     }
 }
 
-fn map_demo() {
-    let mut map = Map::new(320, 200, 12, 10, 20);
-    let mut renderer = renderer::Renderer::new(WIDTH, HEIGHT, 8, 12, 10, 20);
-    renderer.init();
-    renderer.clear();
-
-    // draw all colors
-    // renderer.draw_all_colors();
-    // renderer.flush();
-    // wait_until_pressend_and_released();
-    // renderer.clear();
-
-    // generate random walls
-    map.clear_walls();
-    map.add_random_walls(WALL_DENSITY);
-    map.set_outer_walls();
-    renderer.draw_map_buffer(map.clone());
-    renderer.draw_map();
-    renderer.flush();
-    wait_until_pressend_and_released();
-
-    let mut areas = map.find_distinct_areas();
-    // areas.sort_by(|a, b| a.len().cmp(&b.len())); // Sort areas by size (smallest first)
-
-    while areas.len() > 1 {
-        renderer.draw_map_buffer(map.clone());
-        renderer.draw_map();
-        renderer.draw_areas(&areas);
-        renderer.flush();
-        wait_until_pressend_and_released();
-        for area in areas.iter() {
-            for tile_coord in area {
-                let x = tile_coord.0;
-                let y = tile_coord.1;
-                let index = y * map.tiles_x + x;
-                let index_right = y * map.tiles_x + (x + 1);
-                let index_down = (y + 1) * map.tiles_x + x;
-                if y > 0 && map.tiles[index].up && !area.contains(&(tile_coord.0, tile_coord.1 - 1)) {
-                    map.tiles[index].up = false;
-                    let line = map.wall_coords(x as isize, y as isize, 0);
-                    renderer.framebuffer
-                        .draw_line(line.0 + GUI_WIDTH as isize, line.1, line.2 + GUI_WIDTH as isize, line.3, Color::Red as u8);
-                    break;
-                }
-                if x < map.tiles_x - 1 && (map.tiles[index].right || map.tiles[index_right].left) && !area.contains(&(tile_coord.0 + 1, tile_coord.1)) {
-                    map.tiles[index].right = false;
-                    map.tiles[index_right].left = false;
-                    let line = map.wall_coords(x as isize, y as isize, 1);
-                    renderer.framebuffer
-                        .draw_line(line.0 + GUI_WIDTH as isize + 1, line.1, line.2 + GUI_WIDTH as isize + 1, line.3, Color::Red as u8);
-                    break;
-                }
-                if y < map.tiles_y - 1 && (map.tiles[index].down || map.tiles[index_down].up) && !area.contains(&(tile_coord.0, tile_coord.1 + 1)) {
-                    map.tiles[index].down = false;
-                    map.tiles[index_down].up = false;
-                    let line = map.wall_coords(x as isize, y as isize, 2);
-                    renderer.framebuffer
-                        .draw_line(line.0 + GUI_WIDTH as isize, line.1 + 1, line.2 + GUI_WIDTH as isize, line.3 + 1, Color::Red as u8);
-                    break;
-                }
-                if x > 0 && map.tiles[index].left && !area.contains(&(tile_coord.0 - 1, tile_coord.1)) {
-                    map.tiles[index].left = false;
-                    let line = map.wall_coords(x as isize, y as isize, 3);
-                    renderer.framebuffer
-                        .draw_line(line.0 + GUI_WIDTH as isize, line.1, line.2 + GUI_WIDTH as isize, line.3, Color::Red as u8);
-                    break;
-                }
-            }
-        }
-        renderer.flush();
-        wait_until_pressend_and_released();
-        areas = map.find_distinct_areas();
-    }
-
-    renderer.draw_map_buffer(map.clone());
-    renderer.draw_map();
-    renderer.draw_areas(&areas);
-    renderer.flush();
-    wait_until_pressend_and_released();
-
-    renderer.draw_map_buffer(map.clone());
-    renderer.draw_map();
-    renderer.flush();
-    wait_until_pressend_and_released();
-
-    renderer.deinit();
-}
-
-fn wait_until_pressend_and_released() {
-    let mut mouse_x: i32 = 0;
-    let mut mouse_y: i32 = 0;
-    let mut shooting = false;
-    get_mouse_buffer().clear_events();
-    while !shooting {
-        get_user_input(&mut mouse_x, &mut mouse_y, &mut shooting);
-    }
-    while shooting {
-        get_user_input(&mut mouse_x, &mut mouse_y, &mut shooting);
-    }
-}
-
-fn get_user_input(mouse_x: &mut i32, mouse_y: &mut i32, shooting: &mut bool) -> UserInput {
-    // get mouse and keyboard input
-    let ord = core::sync::atomic::Ordering::Relaxed;
-    let up = UP.load(ord);
-    let down = DOWN.load(ord);
-    let left = LEFT.load(ord);
-    let right = RIGHT.load(ord);
-    let mut new_shooting = false;
-    let mut atleast_once = false;
-    while let Some(event) = get_mouse_buffer().get_last_event() {
-        atleast_once = true;
-        *mouse_x += event.x_movement as i32;
-        *mouse_y += event.y_movement as i32;
-        if *mouse_x < 0 {
-            *mouse_x = 0;
-        } else if *mouse_x >= WIDTH as i32 {
-            *mouse_x = (WIDTH - 1) as i32;
-        }
-        if *mouse_y < 0 {
-            *mouse_y = 0;
-        } else if *mouse_y >= HEIGHT as i32 {
-            *mouse_y = (HEIGHT - 1) as i32;
-        }
-        new_shooting = new_shooting | event.is_left_click(); // shooting if left mouse button is pressed atleast once per tick
-    }
-    let map_mouse_x = *mouse_x as isize;
-    let map_mouse_y = *mouse_y as isize;
-
-    if atleast_once {
-        *shooting = new_shooting; // update shooting state only if there was a mouse event
-    }
-    let shooting = if atleast_once {
-        new_shooting
-    } else {
-        *shooting // keep the previous state if no mouse event occurred
-    };
-
-    let user_input = UserInput {
-        up,
-        down,
-        left,
-        right,
-        shooting,
-        map_mouse_x,
-        map_mouse_y,
-    };
-    user_input
-}
-
 fn handle_network_messages(
-    game: &mut crate::usr::game::game::Game,
+    game: &mut crate::usr::game::tanks::game::Game,
     network_handler: &mut NetworkHandler,
 ) -> Result<(), String> {
-
     if let Ok(messages) = network_handler.poll_messages() {
         for (msg_type, data, sender) in messages {
             match msg_type {
                 MessageType::MapData => {
                     if !data.is_empty() {
-                        let received_map = Map::deserialize(&data);
-                        game.set_and_draw_map(received_map);
+                        game.deserialize_map(&data);
                         //kprintln!("Client: Map updated from server");
                     }
                 }
@@ -434,11 +266,9 @@ fn handle_network_messages(
                         }
 
                         game.deserialize_user_input(player_id, &data);
-                        //kprintln!("Received input from player {}", player_id);
                     }
                 }
                 MessageType::GameStateUpdate => {
-
                     //simulate packet loss
                     if simple_random() < DROP_PROBABILITY {
                         kprintln!("Simulated packet loss for game state update");
@@ -448,7 +278,6 @@ fn handle_network_messages(
                     // Client receives game state update from server
                     if !data.is_empty() {
                         game.deserialize_state(&data);
-                        //kprintln!("Client: Game state updated from server");
                     }
                 }
                 MessageType::Connect => {
@@ -466,7 +295,7 @@ fn handle_network_messages(
                 }
                 _ => {
                     // Handle other message types as needed
-                    //kprintln!("Received message of type {:?} from {:?}", msg_type, sender);
+                    kprintln!("Received message of type {:?} from {:?}", msg_type, sender);
                 }
             }
         }
@@ -475,7 +304,7 @@ fn handle_network_messages(
 }
 
 fn handle_new_client_connection(
-    game: &mut crate::usr::game::game::Game,
+    game: &mut crate::usr::game::tanks::game::Game,
     sender: smoltcp::socket::udp::UdpMetadata,
 ) -> Result<(), String> {
     let player_id = match sender.endpoint.addr {
@@ -495,7 +324,7 @@ fn handle_new_client_connection(
 }
 
 fn handle_disconnected_client(
-    game: &mut crate::usr::game::game::Game,
+    game: &mut crate::usr::game::tanks::game::Game,
     player_id: usize,
 ) -> Result<(), String> {
     game.remove_player(player_id);
@@ -503,11 +332,10 @@ fn handle_disconnected_client(
 }
 
 fn send_user_input_to_server(
-    game: &crate::usr::game::game::Game,
+    game: &crate::usr::game::tanks::game::Game,
     network_handler: &mut NetworkHandler,
     player_id: usize,
 ) -> Result<(), String> {
-
     //Simulate packet loss
     if simple_random() < DROP_PROBABILITY {
         kprintln!("Simulated packet loss for player {}", player_id);
@@ -521,10 +349,9 @@ fn send_user_input_to_server(
 }
 
 fn broadcast_game_state_to_clients(
-    game: &crate::usr::game::game::Game,
+    game: &crate::usr::game::tanks::game::Game,
     network_handler: &mut NetworkHandler,
 ) -> Result<(), String> {
-
     // Simulate packet loss
     if simple_random() < DROP_PROBABILITY {
         kprintln!("Simulated packet loss for game state broadcast");
@@ -554,9 +381,13 @@ pub fn help() -> Result<(), ExitCode> {
         "  {}-ip=<digit>{}        Set client IP to 192.168.0.<digit> (2-255)",
         csi_option, csi_reset
     );
+    println!(
+        "  {}-m, --mapdemo{}      Starts the map demo",
+        csi_option, csi_reset
+    );
     println!("{}Examples:{}", csi_title, csi_reset);
-    println!("  game -s                Start server");
-    println!("  game -ip=2             Connect as client with IP 192.168.0.2");
-    println!("  game -ip=3             Connect as client with IP 192.168.0.3");
+    println!("  game -s            Start server");
+    println!("  game -ip=2         Connect as client with IP 192.168.0.2");
+    println!("  game -ip=3         Connect as client with IP 192.168.0.3");
     Ok(())
 }

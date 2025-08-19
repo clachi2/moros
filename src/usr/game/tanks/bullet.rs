@@ -1,22 +1,25 @@
 use crate::kprintln;
-use crate::usr::game::map::Map;
-use crate::usr::game::state::{BULLET_SPEED, BULLET_TRAVEL_DIST, Serializable};
+use crate::usr::game::tanks::map::Map;
+use crate::usr::game::tanks::state::{BULLET_SPEED, BULLET_TRAVEL_DIST, Serializable};
 use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 use num_traits::Float;
 
-pub(crate) struct Bullet {
-    pub(crate) x: f64,
-    pub(crate) y: f64,
-    pub(crate) pointing_towards_x: f64,
-    pub(crate) pointing_towards_y: f64,
-    pub(crate) already_traveled: f64,
-    pub(crate) path_queue: VecDeque<(f64, f64)>,
-    pub(crate) current_segment_start: (f64, f64),
-    pub(crate) shot_by: usize, // Player ID who shot this bullet
+/// Represents a bullet in the game, including its position, direction, and path.
+pub struct Bullet {
+    pub x: f64,
+    pub y: f64,
+    pub pointing_towards_x: f64,
+    pub pointing_towards_y: f64,
+    pub already_traveled: f64,
+    pub path_queue: VecDeque<(f64, f64)>,
+    pub current_segment_start: (f64, f64),
+    pub shot_by: usize, // Player ID who shot this bullet
 }
 
 impl Bullet {
+    /// Creates a new instance of the `Bullet` struct, initializing its position, target, shooter,
+    /// and entire calculated path (considering any reflections) based on the given map.
     pub fn new(
         start_x: f64,
         start_y: f64,
@@ -41,6 +44,18 @@ impl Bullet {
         bullet
     }
 
+    /// Calculates the path of the Bullet on a provided `Map` and saves it in `self.path_queue`.
+    ///
+    /// The function determines the trajectory of the object by computing its path
+    /// based on its current position, direction, and collisions with the map. The
+    /// path is calculated up to a maximum travel distance (`BULLET_TRAVEL_DIST`) and
+    /// is stored as a sequence of points in `self.path_queue`. If a collision is
+    /// encountered, the object may change direction based on collision rules, and
+    /// the path is updated accordingly.
+    ///
+    /// # Parameters
+    /// - `map`: A reference to the `Map` object representing the walls and boundaries that
+    /// the bullet can collide with.
     fn calculate_path(&mut self, map: &Map) {
         let mut current_x = self.x;
         let mut current_y = self.y;
@@ -54,14 +69,15 @@ impl Bullet {
             direction_y /= length;
         }
 
-        let mut already_traveled = 0.0;
-
+        let mut already_traveled = self.already_traveled;
         while already_traveled < BULLET_TRAVEL_DIST {
+            // Find next collision point
             if let Some((col_x, col_y, new_dir_x, new_dir_y, dist)) =
                 self.find_next_collision(current_x, current_y, direction_x, direction_y, map)
             {
+                // check if the bullet wont reach the next collision point
                 if already_traveled + dist >= BULLET_TRAVEL_DIST {
-                    // not reaching next collision
+                    // travel remaining distance to the collision point
                     let remaining_dist = BULLET_TRAVEL_DIST - already_traveled;
                     self.path_queue.push_back((
                         current_x + direction_x * remaining_dist,
@@ -70,16 +86,14 @@ impl Bullet {
                     break;
                 }
 
+                // Collision found, update position and direction
                 self.path_queue.push_back((col_x, col_y));
-
                 (current_x, current_y) = self.clamp_to_map_bounds_and_round(col_x, col_y, map);
-
                 already_traveled += dist;
-
                 direction_x = new_dir_x;
                 direction_y = new_dir_y;
             } else {
-                // no collision found
+                // no collision found -> bullet travels in a straight line until max distance
                 let remaining_dist = BULLET_TRAVEL_DIST - already_traveled;
                 let final_x = current_x + direction_x * remaining_dist;
                 let final_y = current_y + direction_y * remaining_dist;
@@ -88,13 +102,24 @@ impl Bullet {
             }
         }
 
-        // dequeue first point
+        // dequeue first point and set it as the current target
         if let Some(first_point) = self.path_queue.front() {
             self.pointing_towards_x = first_point.0;
             self.pointing_towards_y = first_point.1;
         }
     }
 
+    /// Clamps the given x and y coordinates to the bounds of the provided map and rounds them to
+    /// 8 decimal places to ensure precision.
+    ///
+    /// # Parameters
+    /// - `x` (`f64`): The x-coordinate to be clamped and rounded.
+    /// - `y` (`f64`): The y-coordinate to be clamped and rounded.
+    /// - `map` (`&Map`): A reference to the map object containing the information about the map's
+    ///   tile dimensions and sizes.
+    ///
+    /// # Returns
+    /// - `(f64, f64)`: A tuple containing the clamped and rounded x and y coordinates.
     fn clamp_to_map_bounds_and_round(&self, x: f64, y: f64, map: &Map) -> (f64, f64) {
         let max_x = (map.tiles_x * map.tile_size) as f64;
         let max_y = (map.tiles_y * map.tile_size) as f64;
@@ -108,6 +133,30 @@ impl Bullet {
         (rounded_x, rounded_y)
     }
 
+    ///
+    /// Finds the next collision of a ray with walls on a grid-based map, given a start position, direction, and map information.
+    ///
+    /// The method uses a DDA (Digital Differential Analyzer) algorithm to traverse tiles along the ray's path,
+    /// checking each tile for potential collisions with walls. If a collision occurs, it calculates the collision point,
+    /// the normal vector of the surface the ray strikes, and the distance from the start to the collision.
+    /// Additionally, it computes the ray's reflected direction based on the wall's normal vector.
+    ///
+    /// ### Parameters:
+    /// - `start_x`: `f64` - The starting `x` coordinate of the ray.
+    /// - `start_y`: `f64` - The starting `y` coordinate of the ray.
+    /// - `dir_x`: `f64` - The `x` direction component of the ray.
+    /// - `dir_y`: `f64` - The `y` direction component of the ray.
+    /// - `map`: `&Map` - A reference to the map object representing the grid and its walls.
+    ///
+    /// ### Returns:
+    /// - `Option<(f64, f64, f64, f64, f64)>`:
+    ///   - `Some((collision_x, collision_y, reflected_dir_x, reflected_dir_y, distance))`:
+    ///     - `collision_x`: `f64` - The `x` coordinate of the collision point.
+    ///     - `collision_y`: `f64` - The `y` coordinate of the collision point.
+    ///     - `reflected_dir_x`: `f64` - The `x` component of the reflected ray's direction.
+    ///     - `reflected_dir_y`: `f64` - The `y` component of the reflected ray's direction.
+    ///     - `distance`: `f64` - The distance from the starting point to the collision.
+    ///   - `None`: If no collision is found.
     fn find_next_collision(
         &self,
         start_x: f64,
@@ -124,6 +173,7 @@ impl Bullet {
         // Calculate which tiles the ray passes through using DDA algorithm
         let todo = self.get_tiles_on_ray(start_x, start_y, dir_x, dir_y, map);
 
+        // Check each tile for collisions
         for (tile_x, tile_y) in todo {
             if tile_x >= map.tiles_x || tile_y >= map.tiles_y {
                 continue;
@@ -145,15 +195,17 @@ impl Bullet {
                     continue;
                 }
 
+                // Get wall coordinates based on tile position and direction
                 let (wx1, wy1, wx2, wy2) =
                     map.wall_coords(tile_x as isize, tile_y as isize, *wall_direction);
 
+                // Check for intersection with the ray
                 if let Some((collision_x, collision_y, distance)) = self.ray_line_intersection(
                     start_x, start_y, dir_x, dir_y, wx1 as f64, wy1 as f64, wx2 as f64, wy2 as f64,
                 ) {
                     if distance > 0.0001 && distance < min_dist {
                         // Small epsilon to avoid self-collision
-                        // Calculate wall normal
+                        // Calculate wall normal for reflection
                         let (normal_x, normal_y) = match *wall_direction {
                             0 => (0.0, -1.0), // up
                             1 => (-1.0, 0.0), // right
@@ -178,8 +230,8 @@ impl Bullet {
                 dir_y
             );
             None
-        }
-        else {
+        } else {
+            // Calculate reflected direction based on the wall normal
             let dot = dir_x * ret.unwrap().2 + dir_y * ret.unwrap().3;
             let new_dir_x = dir_x - 2.0 * dot * ret.unwrap().2;
             let new_dir_y = dir_y - 2.0 * dot * ret.unwrap().3;
@@ -194,6 +246,21 @@ impl Bullet {
         }
     }
 
+    /// Computes the tiles that a ray intersects as it traverses a 2D grid map.
+    ///
+    /// This function uses a Digital Differential Analyzer (DDA) algorithm to
+    /// calculate the tiles that a ray intersects, starting from a given point
+    /// and traveling in a specific direction. The ray traversal takes into
+    /// account tile boundaries within the map limits.
+    ///
+    /// # Parameters
+    /// - `&self`: Borrowed reference to the instance of the struct containing this method.
+    /// - `start_x`: The starting x-coordinate of the ray in world space.
+    /// - `start_y`: The starting y-coordinate of the ray in world space.
+    /// - `dir_x`: The x-component of the direction vector of the ray.
+    /// - `dir_y`: The y-component of the direction vector of the ray.
+    /// - `map`: A reference to the `Map` object, which provides information about the grid
+    ///   structure
     fn get_tiles_on_ray(
         &self,
         start_x: f64,
@@ -265,6 +332,14 @@ impl Bullet {
         tiles
     }
 
+    /// Computes the intersection point of a ray and a line segment, if one exists.
+    ///
+    /// # Returns
+    /// - `Some((intersection_x, intersection_y, distance))` if there is an intersection:
+    ///   - `intersection_x`: The x-coordinate of the intersection point.
+    ///   - `intersection_y`: The y-coordinate of the intersection point.
+    ///   - `distance`: The distance from the ray's starting point to the intersection point.
+    /// - `None` if there is no intersection or the ray and line segment are parallel.
     fn ray_line_intersection(
         &self,
         ray_start_x: f64,
@@ -307,6 +382,22 @@ impl Bullet {
         }
     }
 
+    /// Updates the position and state of the bullet.
+    ///
+    /// The `update` method moves the bullet along its predetermined path based on
+    /// the time delta (`tick_delta`) and its speed. The bullet continues traveling
+    /// from its current position (`self.x`, `self.y`) towards its current target point
+    /// (`self.pointing_towards_x`, `self.pointing_towards_y`), following the path
+    /// defined in `self.path_queue`. During its motion, the bullet may either move
+    /// further along the path or stop if it has reached the end of its travel distance.
+    ///
+    /// # Parameters
+    /// - `tick_delta`: A `f64` value indicating the time interval since the last update.
+    ///                 This value determines how far the bullet travels in the current frame.
+    ///
+    /// # Returns
+    /// A `bool` indicating whether the bullet should remain active (`true`) or be
+    /// removed (`false`).
     pub fn update(&mut self, tick_delta: f64) -> bool {
         // Returns false if bullet should be remove
 
@@ -357,6 +448,7 @@ impl Bullet {
 }
 
 impl Serializable for Bullet {
+    /// Serializes the `Bullet` instance into a byte vector.
     fn serialize(&self) -> Vec<u8> {
         let mut result = Vec::new();
 
@@ -381,6 +473,9 @@ impl Serializable for Bullet {
         result
     }
 
+    /// Deserializes a byte slice into a `Bullet` instance.
+    ///
+    /// If the data is too short, it returns a default `Bullet` with minimal data.
     fn deserialize(data: &[u8]) -> Self {
         if data.len() < 24 {
             // Minimum size for essential fields only (5 f32 values + 1 u32 value)

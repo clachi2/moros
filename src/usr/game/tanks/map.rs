@@ -1,13 +1,13 @@
 use crate::sys::rng::get_u64;
-use crate::usr::game::state::{PLAYER_SIZE, Serializable, WALL_DENSITY};
+use crate::usr::game::tanks::state::{PLAYER_SIZE, Serializable, WALL_DENSITY};
 use alloc::vec;
 use alloc::vec::Vec;
 
-pub(crate) struct Direction {
-    pub(crate) up: bool,
-    pub(crate) right: bool,
-    pub(crate) down: bool,
-    pub(crate) left: bool,
+pub struct Direction {
+    pub up: bool,
+    pub right: bool,
+    pub down: bool,
+    pub left: bool,
 }
 
 impl Clone for Direction {
@@ -58,13 +58,13 @@ impl Serializable for Direction {
     }
 }
 
-pub(crate) struct Map {
-    pub(crate) size_x: usize,
-    pub(crate) size_y: usize,
-    pub(crate) tiles_x: usize,
-    pub(crate) tiles_y: usize,
-    pub(crate) tile_size: usize, // Size of each tile in pixels
-    pub(crate) tiles: Vec<Direction>,
+pub struct Map {
+    pub size_x: usize,
+    pub size_y: usize,
+    pub tiles_x: usize,
+    pub tiles_y: usize,
+    pub tile_size: usize, // Size of each tile in pixels
+    pub tiles: Vec<Direction>,
 }
 
 impl Clone for Map {
@@ -239,7 +239,7 @@ impl Map {
         }
     }
 
-    pub(crate) fn clear_walls(&mut self) {
+    pub fn clear_walls(&mut self) {
         for tile in &mut self.tiles {
             tile.up = false;
             tile.right = false;
@@ -248,7 +248,7 @@ impl Map {
         }
     }
 
-    pub(crate) fn add_random_walls(&mut self, density: f32) {
+    pub fn add_random_walls(&mut self, density: f32) {
         // Add random walls based on the density (only up and left walls to avoid double walls)
         for tile in &mut self.tiles {
             tile.up = random_float() < density.clamp(0.0, 1.0);
@@ -256,7 +256,7 @@ impl Map {
         }
     }
 
-    pub(crate) fn find_distinct_areas(&self) -> Vec<Vec<(usize, usize)>> {
+    pub fn find_distinct_areas(&self) -> Vec<Vec<(usize, usize)>> {
         let mut visited = vec![false; self.tiles_x * self.tiles_y];
         let mut areas = Vec::new();
 

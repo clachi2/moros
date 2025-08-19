@@ -1,25 +1,27 @@
-use crate::usr::game::game::UserInput;
-use crate::usr::game::map::Map;
-use crate::usr::game::state::{PLAYER_SIZE, PLAYER_SPEED};
+use crate::usr::game::tanks::map::Map;
+use crate::usr::game::tanks::state::Serializable;
+use crate::usr::game::tanks::state::{PLAYER_SIZE, PLAYER_SPEED};
+use crate::usr::game::tanks::userinput::UserInput;
 use alloc::vec::Vec;
-use crate::usr::game::state::{Serializable};
 use num_traits::Float;
 
-pub(crate) struct Player {
-    pub(crate) id: usize,
-    pub(crate) x: f64,
-    pub(crate) y: f64,
-    pub(crate) alive: bool,
-    pub(crate) time_of_death: f64, // Timestamp of death (get using time::epoch_time())
-    pub(crate) user_input: UserInput,
-    pub(crate) pointing_to: (usize, usize),
-    pub(crate) points: usize,
-    pub(crate) ammo: usize,
-    pub(crate) last_shot: f64, // Timestamp of the last shot (get using time::epoch_time())
-    pub(crate) last_reload_ammo: f64, // Timestamp of the last ammo reload
+/// Represents a player in the game with attributes such as position, state, user input, and game statistics.
+pub struct Player {
+    pub id: usize,
+    pub x: f64,
+    pub y: f64,
+    pub alive: bool,
+    pub time_of_death: f64, // Timestamp of death (get using time::epoch_time())
+    pub user_input: UserInput,
+    pub pointing_to: (usize, usize),
+    pub points: usize,
+    pub ammo: usize,
+    pub last_shot: f64, // Timestamp of the last shot (get using time::epoch_time())
+    pub last_reload_ammo: f64, // Timestamp of the last ammo reload
 }
 
 impl Clone for Player {
+    /// Creates a new `Player` instance that is a copy of the current player.
     fn clone(&self) -> Self {
         Player {
             id: self.id,
@@ -38,7 +40,20 @@ impl Clone for Player {
 }
 
 impl Player {
+    /// Updates the player's position on a map based on user input, elapsed time, and collision detection.
+    ///
+    /// This function is responsible for incrementally moving the player's position while avoiding collisions
+    /// with obstacles in the environment. Movement is determined by the player's input, which specifies
+    /// the directions for movement (up, down, left, right).
+    ///
+    /// # Parameters
+    ///
+    /// * `tick_delta`: A floating-point value representing the time elapsed since the last update.
+    ///   This is used to calculate the movement distance based on the player's speed.
+    /// * `map`: A reference to the `Map` object, which provides information about the game's environment
+    ///
     pub fn update_position(&mut self, tick_delta: f64, map: &Map) {
+        // Calculate the movement direction based on user input
         let dx = if self.user_input.left {
             -1.0
         } else if self.user_input.right {
@@ -53,6 +68,7 @@ impl Player {
         } else {
             0.0
         };
+        // Calculate the total movement length based on the player's speed and the elapsed time
         let move_length = tick_delta * PLAYER_SPEED;
         let mut moved_length = 0.0;
         loop {
@@ -60,12 +76,14 @@ impl Player {
             let next_y = self.y + dy;
             let mut moved_x = false;
             let mut moved_y = false;
+            // Check for collisions in the next position
             if !self.is_pos_colliding(next_x as isize, self.y as isize, map) {
                 moved_x = true;
             }
             if !self.is_pos_colliding(self.x as isize, next_y as isize, map) {
                 moved_y = true;
             }
+            // diagonal movement
             if moved_x && moved_y {
                 if moved_length + 2.0.sqrt() <= move_length {
                     moved_length += 2.0.sqrt();
@@ -74,14 +92,18 @@ impl Player {
                 } else {
                     break;
                 }
-            } else if moved_x {
+            }
+            // horizontal movement
+            else if moved_x {
                 if moved_length + 1.0 <= move_length {
                     moved_length += 1.0; // move in one direction
                     self.x = next_x; // move horizontally if no collision
                 } else {
                     break;
                 }
-            } else if moved_y {
+            }
+            // vertical movement
+            else if moved_y {
                 if moved_length + 1.0 <= move_length {
                     moved_length += 1.0; // move in one direction
                     self.y = next_y; // move vertically if no collision
@@ -93,7 +115,7 @@ impl Player {
             }
         }
 
-        // add rest after comma
+        // add rest after comma (if last full movement step was colliding, but there is still some distance left to move)
         let rest = (move_length - moved_length).fract();
         if rest > 0.0 {
             let length = (dx * dx + dy * dy).sqrt();
@@ -112,12 +134,21 @@ impl Player {
         }
     }
 
+    /// Determines if a given position is colliding with any walls in the map.
+    ///
+    /// # Parameters
+    /// - `x`: The x-coordinate of the position to check, in world units.
+    /// - `y`: The y-coordinate of the position to check, in world units.
+    /// - `map`: A reference to the `Map` object, which contains information about the tile layout and wall positions.
+    ///
+    /// # Returns
+    /// - `true` if the position collides with any walls; otherwise, `false`.
     fn is_pos_colliding(&self, x: isize, y: isize, map: &Map) -> bool {
         // Convert position to tile coordinates
         let tile_x = (x / map.tile_size as isize).max(0);
         let tile_y = (y / map.tile_size as isize).max(0);
 
-        // TODO 4 tiles statt 9 (3x3) -> jeweils in richtung wo player näher dran ist
+        // Collects 3x3 surrounding tile-indices within the map bounds
         let min_x = tile_x.saturating_sub(1);
         let max_x = (tile_x + 1).min(map.tiles_x as isize - 1);
         let min_y = tile_y.saturating_sub(1);
@@ -170,6 +201,7 @@ impl Player {
 }
 
 impl Serializable for Player {
+    /// Serializes the `Player` instance into a byte vector.
     fn serialize(&self) -> Vec<u8> {
         let mut result = Vec::new();
 
@@ -193,7 +225,6 @@ impl Serializable for Player {
         result.extend_from_slice(&(self.pointing_to.0 as u32).to_le_bytes());
         result.extend_from_slice(&(self.pointing_to.1 as u32).to_le_bytes());
 
-
         // Serialize points (4 bytes)
         result.extend_from_slice(&(self.points as u32).to_le_bytes());
 
@@ -209,6 +240,9 @@ impl Serializable for Player {
         result
     }
 
+    /// Deserializes a byte slice into a `Player` instance.
+    ///
+    /// If the data is too short, it returns a default `Player` with all fields set to false and values to 0.
     fn deserialize(data: &[u8]) -> Self {
         if data.len() < 58 {
             // Minimum size for all fields
@@ -278,7 +312,14 @@ impl Serializable for Player {
     }
 }
 
-// Helper function to check if two line segments intersect
+/// Determines if two line segments intersect.
+///
+/// This function checks whether the line segment from `(x1, y1)` to `(x2, y2)`
+/// intersects with the line segment from `(x3, y3)` to `(x4, y4)`.
+///
+/// # Returns
+///
+/// Returns `true` if the two line segments intersect, and `false` otherwise.
 fn line_intersects_line(
     x1: isize,
     y1: isize,

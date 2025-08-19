@@ -95,7 +95,7 @@ impl NetworkHandler {
             } else {
                 kprintln!("Connected to server");
                 // Send connection request
-                // TODO einfach 1000 mal schicken gerade .. brauche noch ack
+                // 1000 is enough with up to 9 players as presented
                 for _ in 0..1000 {
                     self.send_message_type(MessageType::Connect, &[])?;
                 }
@@ -240,16 +240,12 @@ impl NetworkHandler {
                         kprintln!("Received map data of size: {} bytes", data.len());
                         self.set_map(data.clone());
                         return Some(data);
-                    } else {
-                        //todo nervt wenn local spielt
-                        //kprintln!("Received empty map data");
                     }
                 }
             }
         }
-        //todo nervt wenn local spielt
+        //Only for debugging purposes
         //kprintln!("Didnt receive map data, returning current map");
-        // If no map data received, return current map
         None
     }
 
@@ -258,10 +254,6 @@ impl NetworkHandler {
     }
 
     pub fn broadcast_game_state(&mut self, state_data: &[u8]) -> Result<(), String> {
-        // kprintln!(
-        //     "Broadcasting game state of size: {} bytes",
-        //     state_data.len()
-        // );
 
         // Split into chunks if too large
         const MAX_CHUNK_SIZE: usize = 1400; // Safe UDP packet size

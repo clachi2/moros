@@ -1,7 +1,8 @@
 use alloc::vec::Vec;
-use crate::usr::game::bullet::Bullet;
-use crate::usr::game::map::Map;
-use crate::usr::game::player::Player;
+use crate::usr::game::tanks::bullet::Bullet;
+use crate::usr::game::tanks::game::{TILES_X, TILES_Y, TILE_SIZE};
+use crate::usr::game::tanks::map::Map;
+use crate::usr::game::tanks::player::Player;
 
 pub static PLAYER_SPEED: f64 = 40.0;
 pub static PLAYER_SIZE: usize = 8;
@@ -21,17 +22,17 @@ pub static WALL_DENSITY: f32 = 0.4;
 pub static POINTS_PER_KILL: usize = 1;
 pub static POINTS_PER_DEATH_MINUS: usize = 0;
 
-pub(crate) trait Serializable {
+pub trait Serializable {
     fn serialize(&self) -> Vec<u8>;
     fn deserialize(data: &[u8]) -> Self;
 } // TODO für alle structs implementieren
 
-pub(crate) struct GameState {
-    pub(crate) map: Map,
-    pub(crate) players: Vec<Player>,
-    pub(crate) bullets: Vec<Bullet>,
-    pub(crate) current_player_index: usize,
-    pub(crate) last_tick: f64, // Timestamp
+pub struct GameState {
+    pub map: Map,
+    pub players: Vec<Player>,
+    pub bullets: Vec<Bullet>,
+    pub current_player_index: usize,
+    pub last_tick: f64, // Timestamp
 }
 
 impl Serializable for GameState {
@@ -70,7 +71,7 @@ impl Serializable for GameState {
 
     fn deserialize(data: &[u8]) -> Self {
         if data.len() < 20 {
-            return GameState::new(Map::new(320, 200, 12, 10, 20));
+            return GameState::new(Map::new(320, 200, TILES_X, TILES_Y, TILE_SIZE));
         }
 
         let mut offset = 0;
@@ -85,7 +86,7 @@ impl Serializable for GameState {
         offset += 4;
 
         if data.len() < offset + map_len {
-            return GameState::new(Map::new(320, 200, 12, 10, 20));
+            return GameState::new(Map::new(320, 200, TILES_X, TILES_Y, TILE_SIZE));
         }
 
         let map = Map::deserialize(&data[offset..offset + map_len]);

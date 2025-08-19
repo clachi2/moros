@@ -1,108 +1,36 @@
+use crate::api::process::ExitCode;
 use crate::sys::clk::boot_time;
-use crate::usr::game::bullet::Bullet;
-use crate::usr::game::map::Map;
-use crate::usr::game::player::Player;
-use crate::usr::game::renderer;
-use crate::usr::game::state;
-use crate::usr::game::state::{GUI_WIDTH, MAX_AMMO, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, Serializable, SHOOTING_RATE_PER_SECOND, TICK_RATE, RESPAWN_TIME};
+use crate::sys::mouse::get_mouse_buffer;
+use crate::usr::game::tanks::bullet::Bullet;
+use crate::usr::game::tanks::map::Map;
+use crate::usr::game::tanks::player::Player;
+use crate::usr::game::tanks::renderer;
+use crate::usr::game::tanks::renderer::Color;
+use crate::usr::game::tanks::state;
+use crate::usr::game::tanks::state::{
+    GUI_WIDTH, MAX_AMMO, PLAYER_SIZE, POINTS_PER_DEATH_MINUS, POINTS_PER_KILL, RESPAWN_TIME,
+    SHOOTING_RATE_PER_SECOND, Serializable, TICK_RATE, WALL_DENSITY,
+};
+use crate::usr::game::tanks::userinput::UserInput;
 use alloc::vec::Vec;
 
-pub(crate) struct UserInput {
-    // keyboard input
-    pub(crate) up: bool,
-    pub(crate) right: bool,
-    pub(crate) down: bool,
-    pub(crate) left: bool,
-    // mouse input
-    pub(crate) shooting: bool,
-    pub(crate) map_mouse_x: isize,
-    pub(crate) map_mouse_y: isize,
-}
+pub static COLOR_DEPTH: u8 = 8;
+pub static TILES_X: usize = 12;
+pub static TILES_Y: usize = 10;
+pub static TILE_SIZE: usize = 20;
 
-impl Clone for UserInput {
-    fn clone(&self) -> Self {
-        UserInput {
-            up: self.up,
-            right: self.right,
-            down: self.down,
-            left: self.left,
-            shooting: self.shooting,
-            map_mouse_x: self.map_mouse_x,
-            map_mouse_y: self.map_mouse_y,
-        }
-    }
-}
-
-impl Serializable for UserInput {
-    fn serialize(&self) -> Vec<u8> {
-        let mut result = Vec::new();
-
-        // Pack boolean inputs into a single byte
-        let mut input_flags = 0u8;
-        if self.up {
-            input_flags |= 0b00001;
-        }
-        if self.right {
-            input_flags |= 0b00010;
-        }
-        if self.down {
-            input_flags |= 0b00100;
-        }
-        if self.left {
-            input_flags |= 0b01000;
-        }
-        if self.shooting {
-            input_flags |= 0b10000;
-        }
-        result.push(input_flags);
-
-        // Serialize mouse coordinates (4 bytes each)
-        result.extend_from_slice(&(self.map_mouse_x as i32).to_le_bytes());
-        result.extend_from_slice(&(self.map_mouse_y as i32).to_le_bytes());
-
-        result
-    }
-
-    fn deserialize(data: &[u8]) -> Self {
-        if data.len() < 9 {
-            return UserInput {
-                up: false,
-                right: false,
-                down: false,
-                left: false,
-                shooting: false,
-                map_mouse_x: 0,
-                map_mouse_y: 0,
-            };
-        }
-
-        let input_flags = data[0];
-        let map_mouse_x = i32::from_le_bytes([data[1], data[2], data[3], data[4]]) as isize;
-        let map_mouse_y = i32::from_le_bytes([data[5], data[6], data[7], data[8]]) as isize;
-
-        UserInput {
-            up: (input_flags & 0b00001) != 0,
-            right: (input_flags & 0b00010) != 0,
-            down: (input_flags & 0b00100) != 0,
-            left: (input_flags & 0b01000) != 0,
-            shooting: (input_flags & 0b10000) != 0,
-            map_mouse_x,
-            map_mouse_y,
-        }
-    }
-}
-
-pub(crate) struct Game {
+pub struct Game {
     game_state: state::GameState,
     renderer: renderer::Renderer,
 }
 
 impl Game {
     pub fn new(width: usize, height: usize) -> Self {
-        let mut map = Map::new(width, height, 12, 10, 20);
+        let mut map = Map::new(width, height, TILES_X, TILES_Y, TILE_SIZE);
         map.auto_set_walls();
         let game_state = state::GameState::new(map);
-        let renderer = renderer::Renderer::new(width, height, 8, 12, 10, 20);
+        let renderer =
+            renderer::Renderer::new(width, height, COLOR_DEPTH, TILES_X, TILES_Y, TILE_SIZE);
         Game {
             game_state,
             renderer,
@@ -278,7 +206,8 @@ impl Game {
             //kprintln!("player id {} with index {}", player.id, self.game_state.current_player_index);
             let mouse_x = player.user_input.map_mouse_x;
             let mouse_y = player.user_input.map_mouse_y;
-            self.renderer.draw_mouse_cursor(mouse_x, mouse_y, player.id as u8);
+            self.renderer
+                .draw_mouse_cursor(mouse_x, mouse_y, player.id as u8);
         }
 
         self.renderer.flush();
@@ -324,7 +253,12 @@ impl Game {
 
     pub fn remove_player(&mut self, player_id: usize) {
         // Find the player index by ID
-        if let Some(index) = self.game_state.players.iter().position(|p| p.id == player_id) {
+        if let Some(index) = self
+            .game_state
+            .players
+            .iter()
+            .position(|p| p.id == player_id)
+        {
             // Remove the player from the game state
             self.game_state.players.remove(index);
             //kprintln!("Player with ID {} removed", player_id);
@@ -333,37 +267,40 @@ impl Game {
         }
     }
 
-    pub fn set_and_draw_map(&mut self, map: Map) {
-        self.game_state.map = map.clone();
-        self.renderer.draw_map_buffer(map);
-    }
-
-    pub fn set_user_input(&mut self, player_id: usize, input: UserInput) {
+    pub fn update_user_input(&mut self, player_id: usize, witdth: usize, height: usize) {
         for player in &mut self.game_state.players {
             if player.id == player_id {
-                player.user_input = input;
+                player.user_input.update_from_io(witdth, height);
                 return; // User input set successfully
             }
         }
-        // If player not found, you might want to handle this case
         kprintln!("Player with ID {} not found", player_id);
     }
 
+    pub fn serialize_user_input(&self, player_id: usize) -> Vec<u8> {
+        for player in &self.game_state.players {
+            if player.id == player_id {
+                return player.user_input.serialize();
+            }
+        }
+        Vec::new()
+    }
+
     pub fn deserialize_user_input(&mut self, player_id: usize, data: &[u8]) {
-        let user_input = UserInput::deserialize(data);
-        self.set_user_input(player_id, user_input);
+        for player in &mut self.game_state.players {
+            if player.id == player_id {
+                player.user_input = UserInput::deserialize(data);
+                return; // User input set successfully
+            }
+        }
+        kprintln!("Player with ID {} not found", player_id);
     }
 
     pub fn serialize_state(&self) -> Vec<u8> {
         self.game_state.serialize()
     }
 
-    pub fn serialize_map(&self) -> Vec<u8> {
-        self.game_state.map.serialize()
-    }
-
     pub fn deserialize_state(&mut self, data: &[u8]) {
-        //todo anders schicken
         let last_tick = self.game_state.last_tick;
         let player_index = self.game_state.current_player_index;
 
@@ -376,30 +313,14 @@ impl Game {
         self.renderer.draw_map_buffer(self.game_state.map.clone());
     }
 
+    pub fn serialize_map(&self) -> Vec<u8> {
+        self.game_state.map.serialize()
+    }
+
     pub fn deserialize_map(&mut self, data: &[u8]) {
         let map = Map::deserialize(data);
-        self.set_and_draw_map(map);
-    }
-
-    pub fn get_random_spawn_position(&self) -> (usize, usize) {
-        self.game_state.map.random_pos()
-    }
-
-    pub fn serialize_user_input(&self, player_id: usize) -> Vec<u8> {
-        for player in &self.game_state.players {
-            if player.id == player_id {
-                return player.user_input.serialize();
-            }
-        }
-        Vec::new()
-    }
-
-    pub fn get_player_count(&self) -> usize {
-        self.game_state.players.len()
-    }
-
-    pub fn get_bullet_count(&self) -> usize {
-        self.game_state.bullets.len()
+        self.game_state.map = map.clone();
+        self.renderer.draw_map_buffer(map);
     }
 
     pub fn set_current_player(&mut self, player_id: usize) {
@@ -410,5 +331,146 @@ impl Game {
                 break;
             }
         }
+    }
+
+    pub fn set_new_random_map(&mut self, width: usize, height: usize) {
+        let mut new_map = Map::new(width, height, TILES_X, TILES_Y, TILE_SIZE);
+        new_map.auto_set_walls();
+        self.game_state.map = new_map.clone();
+        self.renderer.draw_map_buffer(new_map);
+    }
+}
+
+pub fn map_demo(width: usize, height: usize) -> Result<(), ExitCode> {
+    let mut map = Map::new(320, 200, TILES_X, TILES_Y, TILE_SIZE);
+    let mut renderer =
+        renderer::Renderer::new(width, height, COLOR_DEPTH, TILES_X, TILES_Y, TILE_SIZE);
+    renderer.init();
+    renderer.clear();
+
+    // generate random walls
+    map.clear_walls();
+    map.add_random_walls(WALL_DENSITY);
+    map.set_outer_walls();
+    renderer.draw_map_buffer(map.clone());
+    renderer.draw_map();
+    renderer.flush();
+    wait_until_pressend_and_released(width, height);
+
+    let mut areas = map.find_distinct_areas();
+    // areas.sort_by(|a, b| a.len().cmp(&b.len())); // Sort areas by size (smallest first)
+
+    while areas.len() > 1 {
+        renderer.draw_map_buffer(map.clone());
+        renderer.draw_map();
+        renderer.draw_areas(&areas);
+        renderer.flush();
+        wait_until_pressend_and_released(width, height);
+        for area in areas.iter() {
+            for tile_coord in area {
+                let x = tile_coord.0;
+                let y = tile_coord.1;
+                let index = y * map.tiles_x + x;
+                let index_right = y * map.tiles_x + (x + 1);
+                let index_down = (y + 1) * map.tiles_x + x;
+                if y > 0 && map.tiles[index].up && !area.contains(&(tile_coord.0, tile_coord.1 - 1))
+                {
+                    map.tiles[index].up = false;
+                    let line = map.wall_coords(x as isize, y as isize, 0);
+                    renderer.framebuffer.draw_line(
+                        line.0 + GUI_WIDTH as isize,
+                        line.1,
+                        line.2 + GUI_WIDTH as isize,
+                        line.3,
+                        Color::Red as u8,
+                    );
+                    break;
+                }
+                if x < map.tiles_x - 1
+                    && (map.tiles[index].right || map.tiles[index_right].left)
+                    && !area.contains(&(tile_coord.0 + 1, tile_coord.1))
+                {
+                    map.tiles[index].right = false;
+                    map.tiles[index_right].left = false;
+                    let line = map.wall_coords(x as isize, y as isize, 1);
+                    renderer.framebuffer.draw_line(
+                        line.0 + GUI_WIDTH as isize + 1,
+                        line.1,
+                        line.2 + GUI_WIDTH as isize + 1,
+                        line.3,
+                        Color::Red as u8,
+                    );
+                    break;
+                }
+                if y < map.tiles_y - 1
+                    && (map.tiles[index].down || map.tiles[index_down].up)
+                    && !area.contains(&(tile_coord.0, tile_coord.1 + 1))
+                {
+                    map.tiles[index].down = false;
+                    map.tiles[index_down].up = false;
+                    let line = map.wall_coords(x as isize, y as isize, 2);
+                    renderer.framebuffer.draw_line(
+                        line.0 + GUI_WIDTH as isize,
+                        line.1 + 1,
+                        line.2 + GUI_WIDTH as isize,
+                        line.3 + 1,
+                        Color::Red as u8,
+                    );
+                    break;
+                }
+                if x > 0
+                    && map.tiles[index].left
+                    && !area.contains(&(tile_coord.0 - 1, tile_coord.1))
+                {
+                    map.tiles[index].left = false;
+                    let line = map.wall_coords(x as isize, y as isize, 3);
+                    renderer.framebuffer.draw_line(
+                        line.0 + GUI_WIDTH as isize,
+                        line.1,
+                        line.2 + GUI_WIDTH as isize,
+                        line.3,
+                        Color::Red as u8,
+                    );
+                    break;
+                }
+            }
+        }
+        renderer.flush();
+        wait_until_pressend_and_released(width, height);
+        areas = map.find_distinct_areas();
+    }
+
+    renderer.draw_map_buffer(map.clone());
+    renderer.draw_map();
+    renderer.draw_areas(&areas);
+    renderer.flush();
+    wait_until_pressend_and_released(width, height);
+
+    renderer.draw_map_buffer(map.clone());
+    renderer.draw_map();
+    renderer.flush();
+    wait_until_pressend_and_released(width, height);
+
+    renderer.deinit();
+
+    Ok(())
+}
+
+fn wait_until_pressend_and_released(width: usize, height: usize) {
+    let mut input = UserInput {
+        up: false,
+        right: false,
+        down: false,
+        left: false,
+        shooting: false,
+        map_mouse_x: 0,
+        map_mouse_y: 0,
+    };
+    get_mouse_buffer().clear_events();
+    while !input.shooting {
+        input.update_from_io(width, height);
+    }
+    while input.shooting {
+        input.update_from_io(width, height);
     }
 }
