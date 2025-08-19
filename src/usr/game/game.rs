@@ -152,6 +152,9 @@ impl Game {
 
     fn handle_player_shooting(&mut self, current_time: f64) {
         for player in &mut self.game_state.players {
+            if !player.alive {
+                continue; // Skip dead players
+            }
             // Handle Player shooting
             if player.user_input.shooting && player.ammo > 0 {
                 // Check if enough time has passed since last shot (rate limiting)

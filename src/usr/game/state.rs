@@ -7,7 +7,7 @@ pub static PLAYER_SPEED: f64 = 40.0;
 pub static PLAYER_SIZE: usize = 8;
 pub static RESPAWN_TIME: f64 = 3.0; // in seconds
 
-pub static BULLET_SPEED: f64 = 40.0;
+pub static BULLET_SPEED: f64 = 80.0;
 pub static BULLET_TRAVEL_DIST: f64 = 200.0;
 pub static SHOOTING_RATE_PER_SECOND: f64 = 5.0;
 pub static MAX_AMMO: usize = 5;
