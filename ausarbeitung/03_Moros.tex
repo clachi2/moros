@@ -1,0 +1,53 @@
+\begin{section}{Hintergrund: MOROS}
+
+MOROS (Minimal Obscure Rust Operating System) ist ein in der Programmiersprache \texttt{Rust} entwickeltes Betriebssystem, das bewusst minimalistisch gehalten ist.
+Es dient als Lehr- und Experimentierplattform, um grundlegende Betriebssystemkonzepte auf einer einfachen, gut überschaubaren Basis zu erproben.
+Der Name deutet bereits darauf hin: \emph{obscure}, da das System weder im Mainstream verbreitet noch für den produktiven Einsatz gedacht ist,
+sondern vor allem für Forschung, Lehre und persönliche Projekte genutzt wird.
+Seine Entwicklung in \texttt{Rust} bringt den Vorteil mit sich, dass Speicher- und Typsicherheit von Beginn an fest im System verankert sind.
+
+\begin{subsection}{Eigenschaften von MOROS}
+MOROS ist vollständig textbasiert.
+Es gibt keine grafische Oberfläche, keine Fenstersysteme und keine modernen Multimedia-Schnittstellen.
+Die Benutzerinteraktion erfolgt über eine Shell, die grundlegende Kommandos unterstützt.
+Das Design erinnert damit an klassische Betriebssysteme aus den 1980er- und frühen 1990er-Jahren, die auf Minimalität und Funktionalität setzten.
+
+Trotz seines geringen Umfangs bietet MOROS bereits einige essentielle Komponenten:
+\begin{itemize}
+    \item \textbf{Shell:} Kommandozeile für Benutzereingaben und Steuerung des Systems.
+    \item \textbf{Dateisystem:} Verwaltung von Dateien und Ordnern in einer klar strukturierten Hierarchie.
+    \item \textbf{Netzwerkstack:} Unterstützung grundlegender Netzwerkkommunikation, u.a. via UDP.
+    \item \textbf{Speicherverwaltung:} Einfache Mechanismen zur Verwaltung von Haupt- und virtuellen Speicher.
+\end{itemize}
+\end{subsection}
+
+\begin{subsection}{Besonderheiten}
+Die Wahl von \texttt{Rust} als Implementierungssprache unterscheidet MOROS von vielen älteren Minimal-OS, die häufig in C oder Assembler entwickelt wurden.
+Rust vereint Systemsprache mit modernen Sicherheitskonzepten.
+Dadurch lassen sich typische Fehlerquellen wie Speicherzugriffsfehler oder
+Race-Conditions in vielen Fällen bereits zur Kompilierzeit verhindern.
+Diese Eigenschaft macht MOROS besonders geeignet für Experimente in sicherheitskritischen Bereichen.
+
+Darüber hinaus folgt MOROS einem modularen Ansatz: Statt eine große monolithische Struktur aufzubauen, werden Kernkomponenten schrittweise erweitert.
+Dies erleichtert das Verständnis und ermöglicht es, einzelne Bausteine gezielt zu verändern oder auszutauschen.
+\end{subsection}
+
+\begin{subsection}{Motivation für Erweiterungen}
+So nützlich MOROS als Minimalplattform ist, so eingeschränkt sind seine Möglichkeiten in der Standardkonfiguration.
+Insbesondere fehlen elementare Schnittstellen, die für interaktive oder grafische Anwendungen erforderlich sind.
+Ein Beispiel ist die Unterstützung für Zeigegeräte wie die Maus, die in MOROS nicht implementiert war.
+Auch für die Ausgabe über den Bildschirm standen lediglich sehr einfache Textoperationen zur Verfügung.
+
+Um ein interaktives Spiel zu realisieren, mussten daher mehrere neue Komponenten entwickelt werden:
+\begin{itemize}
+    \item Implementierung einer vollständigen PS/2-Maus-Schnittstelle über Interrupts.
+    \item Einführung eines Framebuffers, um primitive grafische Operationen wie das Zeichnen von Linien, Rechtecken oder Text in Farben zu ermöglichen.
+    \item Erweiterung und Fehlerbehebung im Netzwerkstack, um stabile UDP-Kommunikation zu gewährleisten.
+    \item Zusätzliche Debugging-Funktionalitäten, um Entwicklungs- und Fehlersuche im Kernel zu erleichtern.
+\end{itemize}
+
+Diese Erweiterungen bilden die Grundlage für die spätere Spieleentwicklung.
+Damit zeigt MOROS nicht nur seine Eignung als Lehrplattform, sondern auch, wie selbst auf einer stark reduzierten Systembasis
+komplexe und interaktive Anwendungen möglich werden.
+\end{subsection}
+\end{section}

@@ -1,0 +1,51 @@
+\chapter{Netzwerk}
+
+\section{Motivation und Testumgebung}
+Die Implementierung eines Mehrspieler-Szenarios stellte eine zentrale Herausforderung bei der Entwicklung des Spiels dar.
+Zwar verfügt \texttt{MOROS} über einen rudimentären Netzwerkstack, die in \texttt{QEMU} integrierte \texttt{listen/connect}-Funktionalität erlaubt jedoch nur Punkt-zu-Punkt-Verbindungen.
+Damit war ein echtes Multiplayer-Setup, bei dem mehrere Clients gleichzeitig mit einem Server interagieren, nicht realisierbar.
+Um dieses Problem zu umgehen, kam das \emph{Virtual Distributed Ethernet (VDE)} zum Einsatz.
+VDE ermöglicht die Einrichtung virtueller Switches und damit die Verbindung mehrerer virtueller Maschinen über ein gemeinsames virtuelles Netzwerk, was insbesondere für Mehrspieler-Szenarien von essenzieller Bedeutung ist.
+
+\section{Server-Client-Architektur}
+Die gewählte Architektur folgt dem klassischen Server-Client-Paradigma.
+Der Server ist für die zentrale Berechnung des Spielzustands verantwortlich, während die Clients lediglich Eingaben liefern und den aktuellen Zustand rendern.
+
+\subsection{Ablauf im Server}
+Der Server sammelt zunächst alle Eingaben der verbundenen Clients ein.
+Anschließend wird der globale Spielzustand berechnet, indem Bewegungen der Spieler, Kugeltrajektorien und Kollisionen aktualisiert werden.
+Am Ende eines jeden Ticks sendet der Server den konsistenten Spielzustand in Form eines Broadcasts an alle Clients zurück.
+
+\subsection{Ablauf im Client}
+Der Client ist primär für zwei Aufgaben verantwortlich: zum einen für das Senden eigener Eingaben (Tastatur- und Mausevents), zum anderen für das Rendern des vom Server empfangenen Spielzustands.
+Die Spiel-Logik selbst wird weitgehend serverseitig berechnet, um Inkonsistenzen zu vermeiden.
+Dennoch existieren bestimmte Mechanismen, bei denen der Client selbst Berechnungen übernimmt, um die Netzwerklast zu reduzieren (z.\,B. bei der Pfadberechnung von Projektilen).
+
+\section{Nachrichtenformate und Protokolle}
+Die Kommunikation zwischen Server und Clients basiert auf einem kompakten binären Protokoll.
+Zentrale Nachrichtentypen sind:
+
+\begin{itemize}
+    \item \texttt{Connect}: Aufbau einer neuen Verbindung
+    \item \texttt{MapRequest}/\texttt{MapData}: Anforderung und Übertragung der aktuellen Karte
+    \item \texttt{PlayerInput}: Übermittlung der Steuerungsinformationen des Clients
+    \item \texttt{GameStateUpdate}: Aktualisierter Spielzustand vom Server
+    \item \texttt{Disconnect}: Abmeldung eines Clients
+\end{itemize}
+
+Um die Übertragung effizient zu gestalten, werden Eingaben in Bitmasken codiert.
+Richtungsangaben und Schussaktionen lassen sich auf ein einzelnes Byte reduzieren, wodurch der Overhead pro Client signifikant verringert wird.
+Komplexere Objekte wie Kugeln werden nicht vollständig übertragen; stattdessen erhalten Clients nur Startpunkt, Richtung und Spieler-ID.
+Die exakte Pfadberechnung erfolgt lokal, was die Paketgröße drastisch reduziert (von über 100 Bytes auf lediglich 24 Bytes pro Projektil).
+
+\section{Synchronisation und Robustheit}
+Ein zentrales Problem in verteilten Spielen ist der Umgang mit asynchronen Zuständen und Paketverlusten.
+Die gewählte Lösung basiert auf periodischen State-Updates des Servers, die sicherstellen, dass Clients regelmäßig synchronisiert werden.
+Kurzfristige Paketverluste können so kompensiert werden, da der nächste gültige Spielzustand überschreibend angewandt wird.
+
+Als Transportprotokoll kommt \texttt{UDP} zum Einsatz.
+Dieses bietet zwar keine garantierte Zustellung, ist jedoch aufgrund seiner geringen Latenz und des reduzierten Overheads für Echtzeitanwendungen prädestiniert.
+Einschränkungen ergeben sich aus der maximal sicheren \emph{Maximum Transmission Unit (MTU)} von etwa 1500 Bytes.
+Werden Pakete größer, erfolgt eine Fragmentierung auf IP-Ebene, die bei Verlust einzelner Fragmente zum Ausfall des gesamten Pakets führt.
+In der Praxis limitiert dies die maximal mögliche Anzahl an Spielern und gleichzeitig existierenden Projektilen pro Spielrunde.
+

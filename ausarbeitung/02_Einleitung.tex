@@ -1,30 +1,29 @@
 \begin{section}{Einleitung}
 
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
+Betriebssysteme bilden das Fundament moderner Computer.
+Sie koordinieren Ressourcen, stellen Schnittstellen bereit und ermöglichen es, Anwendungen auf einer
+einheitlichen Basis auszuführen.
+Gleichzeitig sind sie traditionell ein Forschungs- und Lehrfeld, um grundlegende Konzepte der Systemsoftware zu erproben.
+Insbesondere minimalistische Betriebssysteme erlauben es, Funktionen von Grund auf zu verstehen und gezielt zu erweitern.
 
-Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi. Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
+In diesem Seminarprojekt haben wir uns mit MOROS (Minimal Obscure Rust Operating System) beschäftigt.
+MOROS ist ein in \texttt{Rust} geschriebenes, bewusst
+klein gehaltenes Betriebssystem, das rein textbasiert arbeitet und zunächst nur über elementare Komponenten wie Shell, Dateisystem und Netzwerkstack verfügt.
+Sein reduziertes Design macht MOROS zu einer interessanten Plattform, um gezielt neue Funktionalitäten zu erproben.
 
-Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
+Unser Ziel war es, MOROS um eine Anwendung zu erweitern, die einerseits technische Herausforderungen mit sich bringt, andererseits aber auch anschaulich und
+unterhaltsam demonstriert, was mit einem minimalistischen Betriebssystem möglich ist.
+Dazu haben wir ein verteiltes Mehrspieler-Spiel entwickelt, das grundlegende
+Erweiterungen auf mehreren Ebenen erforderte: von der Implementierung einer Maus-Schnittstelle über eine einfache Grafik-Ausgabe bis hin zur Kommunikation über
+das Netzwerk.
 
-Nam liber tempor cum soluta nobis eleifend option congue nihil imperdiet doming id quod mazim placerat facer possim assum. Lorem
-
-\end{section}
-
-\begin{section}{Lorem Ipsum}
-
-Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
-
-Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi. Lorem ipsum dolor sit amet, consectetuer adipiscing elit, sed diam nonummy nibh euismod tincidunt ut laoreet dolore magna aliquam erat volutpat.
-
-Ut wisi enim ad minim veniam, quis nostrud exerci tation ullamcorper suscipit lobortis nisl ut aliquip ex ea commodo consequat. Duis autem vel eum iriure dolor in hendrerit in vulputate velit esse molestie consequat, vel illum dolore eu feugiat nulla facilisis at vero eros et accumsan et iusto odio dignissim qui blandit praesent luptatum zzril delenit augue duis dolore te feugait nulla facilisi.
-
-Nam liber tempor cum soluta nobis eleifend option congue nihil imperdiet doming id quod mazim placerat facer possim assum. Lorem
-
-\end{section}
-
-\begin{section}{Wasgeht}
-    Hallo, dies ist ein Liebesbrief von Copiliot an Dich!
-    Dieser Liebesbrief ist so lang, dass er in eine eigene Section passt.
-    Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam
+Die folgende Ausarbeitung beschreibt dieses Projekt im Detail.
+Zunächst wird MOROS selbst vorgestellt und erläutert, welche zusätzlichen Komponenten notwendig
+waren, um die Spieleentwicklung zu ermöglichen.
+Anschließend wird das Spiel mit seinen Kernmechanismen wie Map-Generierung, Spieler- und Bullet-Bewegung
+sowie Rendering beschrieben.
+Darauf folgt die Verteilung über das Netzwerk und die zugehörige Server-Client-Architektur.
+Abschließend erfolgt eine Analyse und
+Bewertung des Projekts, bevor ein Fazit und mögliche Perspektiven aufgezeigt werden.
 
 \end{section}
