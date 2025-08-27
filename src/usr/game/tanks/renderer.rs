@@ -6,6 +6,7 @@ use crate::usr::game::tanks::state::{GUI_HEIGHT_PER_PLAYER, GUI_WIDTH, MAX_AMMO,
 use alloc::format;
 use alloc::vec::Vec;
 
+/// Basic colors for 8-bit color depth
 pub enum Color {
     Black = 0x00,
     Blue = 0x01,
@@ -25,6 +26,7 @@ pub enum Color {
     White = 0x0F,
 }
 
+/// Renderer for drawing game elements to the screen using a framebuffer.
 pub struct Renderer {
     screen_width: usize,
     screen_height: usize,
@@ -37,6 +39,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
+    /// Creates a new `Renderer` instance with the specified screen dimensions, color depth, and tile configuration.
     pub fn new(
         screen_width: usize,
         screen_height: usize,
@@ -62,6 +65,9 @@ impl Renderer {
         }
     }
 
+    /// Initializes the game environment by configuring the display settings (especially by changing to 320x200 VGA-mode), setting the color palette,
+    /// and clearing the framebuffer.
+    ///
     pub fn init(&mut self) {
         if self.screen_width == 320 && self.screen_height == 200 {
             write("/dev/vga/mode", b"320x200").expect("Could not switch to graphics mode");
@@ -75,21 +81,30 @@ impl Renderer {
         self.framebuffer.clear(Color::LightGray as u8);
     }
 
+    /// Deinitializes the VGA setup and restores the default VGA mode and settings.
+    ///
     pub fn deinit(&mut self) {
         write("/dev/vga/mode", b"80x25").expect("Could not switch to graphics mode");
         VgaPalette::default().write();
         print!("\x1b[?25h"); // Cursor einblenden
     }
 
+    /// Flushes the current framebuffer content to the display.
     pub fn flush(&mut self) {
         // flush framebuffer to file
         self.framebuffer.flush();
     }
 
+    /// Clears the framebuffer with a light gray color.
     pub fn clear(&mut self) {
         self.framebuffer.clear(Color::LightGray as u8);
     }
 
+    /// Draws the player character on the screen.
+    ///
+    /// This method renders a square-shaped player of a predefined size (`PLAYER_SIZE`)
+    /// at the specified `(x, y)` coordinates on the framebuffer. Each pixel in the square
+    /// is drawn with the provided color value.
     pub fn draw_player(&mut self, x: isize, y: isize, color: u8) {
         for dy in 0..PLAYER_SIZE {
             for dx in 0..PLAYER_SIZE {
@@ -99,6 +114,11 @@ impl Renderer {
         }
     }
 
+    /// Draws a bullet on the screen at the specified (x, y) coordinates.
+    ///
+    /// The bullet is rendered as a 2x2 square of pixels and is drawn using the specified color.
+    /// This function modifies the internal framebuffer to render the bullet.
+    ///
     pub fn draw_bullet(&mut self, x: isize, y: isize, color: u8) {
         // Draw a simple bullet as a small square
         for dy in 0..2 {
@@ -109,6 +129,14 @@ impl Renderer {
         }
     }
 
+    /// Draws a player's statistics on the GUI, including a border, player's points, and remaining ammo.
+    ///
+    /// # Parameters
+    /// - `index`: The player's index (used for determining the Y position of the stat display).
+    /// - `player_id`: A unique identifier for the player, used to determine the color of elements.
+    /// - `points`: The number of points currently scored by the player.
+    /// - `ammo`: The amount of ammo remaining for the player.
+    ///
     pub fn draw_stat(&mut self, index: usize, player_id: usize, points: usize, ammo: usize) {
         // Draw 2px outline around the stats
         let y = (index * GUI_HEIGHT_PER_PLAYER) as isize;
@@ -147,6 +175,7 @@ impl Renderer {
             true, true, false, false, true, true, false, false, true, true, true, true, true,
         ];
 
+        // Draw ammo
         for i in 0..MAX_AMMO {
             let bullet_x = GUI_WIDTH as isize - (MAX_AMMO as isize * 5) + (i * 5) as isize - 2;
             let bullet_y = y + 3;
@@ -167,13 +196,20 @@ impl Renderer {
         }
     }
 
+    /// Draws a mouse cursor at the specified (x, y) coordinates using the given color.
     pub fn draw_mouse_cursor(&mut self, x: isize, y: isize, color: u8) {
         // Draw a simple crosshair as mouse cursor
-        //let cursor_color = Color::Red as u8; // White color
         self.framebuffer.draw_line(x - 4, y, x + 4, y, color);
         self.framebuffer.draw_line(x, y - 4, x, y + 4, color);
     }
 
+    /// Draws marked areas on a map buffer. (This is for the map-demo only)
+    ///
+    /// This method iterates over the provided areas, where each area consists of a
+    /// vector of coordinate pairs `(usize, usize)` representing `(x, y)` positions on
+    /// the map. For each coordinate, a rectangle is drawn on a framebuffer at a specified
+    /// position, scaled and offset by the tile size and GUI dimensions.
+    ///
     pub fn draw_areas(&mut self, areas: &Vec<Vec<(usize, usize)>>) {
         // Draw areas on the map buffer
         for (i, area) in areas.iter().enumerate() {
@@ -191,24 +227,24 @@ impl Renderer {
         }
     }
 
-    pub fn draw_all_colors(&mut self) {
-        for i in 0..256 {
-            self.framebuffer.draw_line(
-                i,
-                0,
-                i,
-                (self.screen_height - 1) as isize,
-                i as u8, // Use color index as color
-            );
-        }
-    }
-
+    /// Copies the map buffer to the main framebuffer at a fixed position.
     pub fn draw_map(&mut self) {
         // write map to framebuffer
         self.framebuffer
             .copy_from_at(&self.map_buffer, GUI_WIDTH, 0);
     }
 
+    /// Draws the map layout onto the map buffer.
+    ///
+    /// This function takes a `Map` object and renders its tile-based representation
+    /// onto the `map_buffer`. It first clears the buffer with a light gray background,
+    /// then iterates over the tiles of the `map` and draws the walls (if present)
+    /// for each tile in black.
+    ///
+    /// # Parameters
+    /// - `map`: The `Map` structure representing the tile-based layout to be drawn,
+    ///   which includes tile information (e.g., wall presence) and dimensions.
+    ///
     pub fn draw_map_buffer(&mut self, map: Map) {
         // Clear the map buffer
         self.map_buffer.clear(Color::LightGray as u8);

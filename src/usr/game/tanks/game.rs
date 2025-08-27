@@ -19,12 +19,14 @@ pub static TILES_X: usize = 12;
 pub static TILES_Y: usize = 10;
 pub static TILE_SIZE: usize = 20;
 
+/// Main game structure containing the game state and renderer.
 pub struct Game {
     game_state: state::GameState,
     renderer: renderer::Renderer,
 }
 
 impl Game {
+    /// Creates a new `Game` instance with the specified width and height.
     pub fn new(width: usize, height: usize) -> Self {
         let mut map = Map::new(width, height, TILES_X, TILES_Y, TILE_SIZE);
         map.auto_set_walls();
@@ -37,16 +39,55 @@ impl Game {
         }
     }
 
+    /// Initializes the game, setting up the map and renderer.
     pub fn init(&mut self) {
         self.game_state.map.auto_set_walls();
         self.renderer.init();
         self.renderer.draw_map_buffer(self.game_state.map.clone());
     }
 
+    /// Deinitializes the game, cleaning up resources.
     pub fn deinit(&mut self) {
         self.renderer.deinit();
     }
 
+    /// Updates the game state on every tick, advancing the simulation forward based on the time elapsed.
+    ///
+    /// This method performs critical game logic, including updating entity positions, handling interactions,
+    /// and ensuring the game runs consistently at the defined tick rate.
+    ///
+    /// # Functionality
+    /// - **Tick Timing:**
+    ///   - Calculates the time elapsed since the last tick using the `boot_time()`.
+    ///   - Ensures that ticks only progress when enough time has passed according to the defined `TICK_RATE`.
+    ///   - If insufficient time has passed, the method returns early without processing further updates.
+    ///   - Updates the `last_tick` timestamp after completing the tick calculations.
+    ///
+    /// - **Player Updates:**
+    ///   - Iterates over all players in the game.
+    ///   - For players marked as `alive`, their positions are updated using the elapsed time (`tick_delta`) and the game map.
+    ///
+    /// - **Player Shooting:**
+    ///   - Processes any ongoing or newly initiated shooting actions for players based on the current game state and time.
+    ///
+    /// - **Bullet Updates:**
+    ///   - Updates the positions of all bullets in the game based on their movement logic and elapsed time.
+    ///   - Removes bullets that are no longer active (e.g., if they collided or exceeded their range).
+    ///
+    /// - **Collision Detection:**
+    ///   - Handles collisions between players and bullets.
+    ///   - Adjusts the game state when a collision is detected, such as updating player health, marking players/bullets as inactive, or generating effects.
+    ///
+    /// - **Player Respawning:**
+    ///   - Checks whether dead players should respawn (based on time or other conditions).
+    ///   - Handles the necessary state changes to bring a player back into the game post-respawn.
+    ///
+    /// # Notes
+    /// - This function assumes that `TICK_RATE` is predefined and determines the frequency of game ticks.
+    /// - It also expects the game state (`self.game_state`) to contain valid references to players, bullets, and the map.
+    ///
+    /// # Usage
+    /// Call this method on every frame or at regular intervals to ensure the game progresses consistently as intended.
     pub fn tick(&mut self) {
         // Tick timing
         let current_time = boot_time();
@@ -78,6 +119,13 @@ impl Game {
         self.handle_player_respawning(current_time);
     }
 
+    /// Handles player shooting logic, including rate limiting and ammo management.
+    ///
+    /// This function processes each player's shooting input, creates bullets,
+    /// and manages ammo reloading over time
+    ///
+    /// # Parameters
+    /// - `current_time`: The current time in seconds, used for rate limiting and reload
     fn handle_player_shooting(&mut self, current_time: f64) {
         for player in &mut self.game_state.players {
             if !player.alive {
@@ -118,6 +166,11 @@ impl Game {
         }
     }
 
+    /// Handles collisions between players and bullets, updating player states and awarding points.
+    /// This function checks for collisions, marks players as dead, removes bullets,
+    /// and awards points to players who successfully hit others.
+    /// # Parameters
+    /// - `current_time`: The current time in seconds, used for updating player
     fn handle_player_bullet_collisions(&mut self, current_time: f64) {
         let mut bullets_to_remove = Vec::new();
         let mut player_ids_to_award = Vec::new();
@@ -155,6 +208,11 @@ impl Game {
         }
     }
 
+    /// Handles the respawning of dead players after a set respawn time.
+    /// This function checks each player's status and respawns them if the
+    /// required time has passed since their death.
+    /// # Parameters
+    /// - `current_time`: The current time in seconds, used to determine if a player
     fn handle_player_respawning(&mut self, current_time: f64) {
         for player in &mut self.game_state.players {
             if !player.alive && (current_time - player.time_of_death) >= RESPAWN_TIME {
@@ -169,6 +227,10 @@ impl Game {
         }
     }
 
+    /// Renders the current game state to the screen.
+    /// This method clears the screen, draws the map, players, bullets,
+    /// player stats, and the mouse cursor for the current player.
+    /// It then flushes the renderer to update the display.
     pub fn draw(&mut self) {
         self.renderer.clear();
 
@@ -213,6 +275,11 @@ impl Game {
         self.renderer.flush();
     }
 
+    /// Adds a new player to the game.
+    /// If a player with the same ID already exists, it does not add a duplicate.
+    /// The new player is initialized at a random position on the map with default attributes.
+    /// # Parameters
+    /// - `player_id`: The unique identifier for the new player.
     pub fn add_player(&mut self, player_id: usize) {
         // Check if player already exists
         for player in &self.game_state.players {
@@ -251,6 +318,11 @@ impl Game {
         self.game_state.players.push(new_player);
     }
 
+    /// Removes a player from the game based on their unique identifier.
+    /// If the player with the specified ID is found, they are removed from the game state
+    /// and a message is logged. If no such player exists, a different message is logged.
+    /// # Parameters
+    /// - `player_id`: The unique identifier of the player to be removed.
     pub fn remove_player(&mut self, player_id: usize) {
         // Find the player index by ID
         if let Some(index) = self
@@ -267,6 +339,14 @@ impl Game {
         }
     }
 
+    /// Updates the user input for a specific player based on the provided width and height.
+    /// This function searches for the player with the given `player_id` and updates their
+    /// `user_input` field by calling the `update_from_io` method with the specified
+    /// width and height parameters.
+    /// If the player is found, their input is updated; otherwise, a message is logged
+    /// indicating that the player was not found.
+    /// # Parameters
+    /// - `player_id`: The unique identifier of the player whose input is to be updated
     pub fn update_user_input(&mut self, player_id: usize, witdth: usize, height: usize) {
         for player in &mut self.game_state.players {
             if player.id == player_id {
@@ -277,6 +357,16 @@ impl Game {
         kprintln!("Player with ID {} not found", player_id);
     }
 
+    /// Serializes the user input of a specific player into a byte vector.
+    /// This function searches for the player with the given `player_id` and
+    /// serializes their `user_input` field using the `serialize` method.
+    /// If the player is found, their serialized input is returned; otherwise,
+    /// an empty vector is returned.
+    /// # Parameters
+    /// - `player_id`: The unique identifier of the player whose input is to be serialized
+    /// # Returns
+    /// A vector of bytes representing the serialized user input of the specified player.
+    /// If the player is not found, an empty vector is returned.
     pub fn serialize_user_input(&self, player_id: usize) -> Vec<u8> {
         for player in &self.game_state.players {
             if player.id == player_id {
@@ -286,6 +376,14 @@ impl Game {
         Vec::new()
     }
 
+    /// Deserializes and updates the user input for a specific player based on the provided byte slice.
+    /// This function searches for the player with the given `player_id` and updates their
+    /// `user_input` field by calling the `deserialize` method with the provided byte slice
+    /// `data`. If the player is found, their input is updated; otherwise,
+    /// a message is logged indicating that the player was not found.
+    /// # Parameters
+    /// - `player_id`: The unique identifier of the player whose input is to be updated
+    /// - `data`: A byte slice containing the serialized user input data to be deserialized
     pub fn deserialize_user_input(&mut self, player_id: usize, data: &[u8]) {
         for player in &mut self.game_state.players {
             if player.id == player_id {
@@ -296,10 +394,16 @@ impl Game {
         kprintln!("Player with ID {} not found", player_id);
     }
 
+    /// Serializes the entire game state into a byte vector.
     pub fn serialize_state(&self) -> Vec<u8> {
         self.game_state.serialize()
     }
 
+    /// Deserializes the game state from a byte slice and updates the current game state.
+    /// It preserves the last tick time and the current player index to maintain continuity.
+    /// After updating the game state, it also refreshes the renderer with the new map.
+    /// # Parameters
+    /// - `data`: A byte slice containing the serialized game state data to be deserialized
     pub fn deserialize_state(&mut self, data: &[u8]) {
         let last_tick = self.game_state.last_tick;
         let player_index = self.game_state.current_player_index;
@@ -313,16 +417,28 @@ impl Game {
         self.renderer.draw_map_buffer(self.game_state.map.clone());
     }
 
+    /// Serializes the current game map into a byte vector.
     pub fn serialize_map(&self) -> Vec<u8> {
         self.game_state.map.serialize()
     }
 
+    /// Deserializes the game map from a byte slice and updates the current game map.
+    /// After updating the map, it also refreshes the renderer with the new map.
+    /// # Parameters
+    /// - `data`: A byte slice containing the serialized map data to be deserialized
     pub fn deserialize_map(&mut self, data: &[u8]) {
         let map = Map::deserialize(data);
         self.game_state.map = map.clone();
         self.renderer.draw_map_buffer(map);
     }
 
+    /// Sets the current player based on the provided player ID.
+    /// This function searches for the player with the given `player_id` and updates
+    /// the `current_player_index` in the game state to point to that player.
+    /// If the player is found, the current player index is updated; otherwise,
+    /// no changes are made.
+    /// # Parameters
+    /// - `player_id`: The unique identifier of the player to be set as the current
     pub fn set_current_player(&mut self, player_id: usize) {
         // Find the player index by ID
         for (index, player) in self.game_state.players.iter().enumerate() {
@@ -333,6 +449,11 @@ impl Game {
         }
     }
 
+    /// Generates a new random map with the specified width and height,
+    /// updates the game state with the new map, and refreshes the renderer.
+    /// # Parameters
+    /// - `width`: The width of the new map in pixels
+    /// - `height`: The height of the new map in pixels
     pub fn set_new_random_map(&mut self, width: usize, height: usize) {
         let mut new_map = Map::new(width, height, TILES_X, TILES_Y, TILE_SIZE);
         new_map.auto_set_walls();
@@ -341,6 +462,15 @@ impl Game {
     }
 }
 
+/// A demo function that showcases the map generation and area connection algorithm.
+/// It generates a random map with walls, finds distinct areas, and connects them by removing walls.
+/// The demo waits for user input (mouse click) to proceed through each step of the process.
+/// # Parameters
+/// - `width`: The width of the display area for the demo
+/// - `height`: The height of the display area for the demo
+/// # Returns
+/// - `Ok(())` if the demo completes successfully
+/// - `Err(ExitCode)` if an error occurs during the demo
 pub fn map_demo(width: usize, height: usize) -> Result<(), ExitCode> {
     let mut map = Map::new(320, 200, TILES_X, TILES_Y, TILE_SIZE);
     let mut renderer =
@@ -456,6 +586,12 @@ pub fn map_demo(width: usize, height: usize) -> Result<(), ExitCode> {
     Ok(())
 }
 
+/// Waits until the mouse is pressed and then released. (This is only used in the map demo)
+/// This function continuously checks the mouse input state and only returns
+/// after a complete press-and-release cycle is detected.
+/// # Parameters
+/// - `width`: The width of the boundary or map, used to clamp mouse input to valid x-coordinates
+/// - `height`: The height of the boundary or map, used to clamp mouse input to valid y-coordinates
 fn wait_until_pressend_and_released(width: usize, height: usize) {
     let mut input = UserInput {
         up: false,

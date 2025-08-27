@@ -22,11 +22,13 @@ pub static WALL_DENSITY: f32 = 0.4;
 pub static POINTS_PER_KILL: usize = 1;
 pub static POINTS_PER_DEATH_MINUS: usize = 0;
 
+/// Trait for serializing and deserializing game state components.
 pub trait Serializable {
     fn serialize(&self) -> Vec<u8>;
     fn deserialize(data: &[u8]) -> Self;
-} // TODO für alle structs implementieren
+}
 
+/// Represents the entire state of the game, including the map, players, bullets, and timing information.
 pub struct GameState {
     pub map: Map,
     pub players: Vec<Player>,
@@ -35,6 +37,7 @@ pub struct GameState {
     pub last_tick: f64, // Timestamp
 }
 
+/// Implements serialization and deserialization for the `GameState` struct.
 impl Serializable for GameState {
     fn serialize(&self) -> Vec<u8> {
         let mut result = Vec::new();
@@ -204,6 +207,7 @@ impl Serializable for GameState {
 }
 
 impl GameState {
+    /// Creates a new `GameState` instance with the provided map and initializes other fields.
     pub fn new(map: Map) -> Self {
         GameState {
             map,

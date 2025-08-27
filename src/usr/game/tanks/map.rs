@@ -3,6 +3,7 @@ use crate::usr::game::tanks::state::{PLAYER_SIZE, Serializable, WALL_DENSITY};
 use alloc::vec;
 use alloc::vec::Vec;
 
+/// Represents the wall directions for a tile in the map.
 pub struct Direction {
     pub up: bool,
     pub right: bool,
@@ -10,6 +11,7 @@ pub struct Direction {
     pub left: bool,
 }
 
+/// Clone implementation for Direction
 impl Clone for Direction {
     fn clone(&self) -> Self {
         Direction {
@@ -21,6 +23,7 @@ impl Clone for Direction {
     }
 }
 
+/// Serializable implementation for Direction
 impl Serializable for Direction {
     fn serialize(&self) -> Vec<u8> {
         let mut result = 0u8;
@@ -58,6 +61,8 @@ impl Serializable for Direction {
     }
 }
 
+
+/// Represents the game map with tiles and their wall configurations.
 pub struct Map {
     pub size_x: usize,
     pub size_y: usize,
@@ -67,6 +72,8 @@ pub struct Map {
     pub tiles: Vec<Direction>,
 }
 
+
+/// Clone implementation for Map
 impl Clone for Map {
     fn clone(&self) -> Self {
         Map {
@@ -81,6 +88,7 @@ impl Clone for Map {
 }
 
 impl Map {
+    /// Creates a new Map instance with the specified dimensions and tile configurations.
     pub fn new(
         size_x: usize,
         size_y: usize,
@@ -107,6 +115,15 @@ impl Map {
         }
     }
 
+    /// Calculates the coordinates of a wall segment on a grid based on tile coordinates and facing direction.
+    ///
+    /// # Parameters
+    /// - `x`, `y`:  Coordinates of the tile (zero-based indexing).
+    /// - `facing`: Direction of the wall relative to the tile. Valid values are:
+    ///   - `0`: Up, `1`: Right, `2`: Down, `3`: Left
+    ///
+    /// # Returns
+    /// Returns a tuple `(x1, y1, x2, y2)` representing the starting and ending coordinates of the wall
     pub fn wall_coords(&self, x: isize, y: isize, facing: isize) -> (isize, isize, isize, isize) {
         // facing: 0 = up, 1 = right, 2 = down, 3 = left
         let tx = self.tiles_x as isize;
@@ -117,25 +134,27 @@ impl Map {
         }
         match facing {
             0 => {
-                // (x * ts, y * ts, (x + 1) * ts - 1, y * ts) // up
                 (x * ts, y * ts, (x + 1) * ts, y * ts) // up
             }
             1 => {
-                // ((x + 1) * ts - 1, y * ts, (x + 1) * ts - 1, (y + 1) * ts - 1) // right
                 ((x + 1) * ts - 1, y * ts, (x + 1) * ts - 1, (y + 1) * ts) // right
             }
             2 => {
-                // (x * ts, (y + 1) * ts - 1, (x + 1) * ts - 1, (y + 1) * ts - 1) // down
                 (x * ts, (y + 1) * ts - 1, (x + 1) * ts, (y + 1) * ts - 1) // down
             }
             3 => {
-                // (x * ts, y * ts, x * ts, (y + 1) * ts - 1) // left
                 (x * ts, y * ts, x * ts, (y + 1) * ts) // left
             }
             _ => panic!("Invalid facing direction"),
         }
     }
 
+    /// Generates a random position within the bounds of a grid.
+    ///
+    /// # Returns
+    /// A tuple `(usize, usize)` representing the x and y coordinates of the random position.
+    /// The position is centered within a tile, accounting for the player's size, so that there are no collisions with walls.
+    ///
     pub fn random_pos(&self) -> (usize, usize) {
         let tile_x = get_u64() as usize % self.tiles_x;
         let tile_y = get_u64() as usize % self.tiles_y;
@@ -144,6 +163,7 @@ impl Map {
         (x, y)
     }
 
+    /// Sets walls around the outer edges of the map.
     pub fn set_outer_walls(&mut self) {
         for x in 0..self.tiles_x {
             self.tiles[x].up = true; // Top row
@@ -155,6 +175,7 @@ impl Map {
         }
     }
 
+    /// Sets the wall configuration for a specific tile at (x, y).
     pub fn set_tile(&mut self, x: usize, y: usize, walls: Direction) {
         if x < self.tiles_x && y < self.tiles_y {
             let index = y * self.tiles_x + x;
@@ -164,6 +185,19 @@ impl Map {
         }
     }
 
+    /// Sets the wall configuration for each tile on the map using a bitmap representation.
+    ///
+    /// # Parameters
+    /// - `bitmap`: A 2D slice of booleans (`&[[bool; 4]]`) where each inner array represents
+    ///   the wall configuration of a single tile. Each inner array must correspond to the following
+    ///   directions:
+    ///     - Index `0`: `up`
+    ///     - Index `1`: `right`
+    ///     - Index `2`: `down`
+    ///     - Index `3`: `left`
+    ///   The number of elements in the bitmap must match the total number of tiles on the map, determined
+    ///   by `self.tiles_x * self.tiles_y`.
+    ///
     pub fn set_walls_bitmap(&mut self, bitmap: &[[bool; 4]]) {
         if bitmap.len() != self.tiles_x * self.tiles_y {
             panic!("Bitmap size does not match map dimensions");
@@ -181,6 +215,15 @@ impl Map {
         }
     }
 
+    /// Automatically sets walls within the grid or map structure to ensure a connected layout.
+    ///
+    /// The method performs the following steps:
+    /// 1. Clears all existing walls to start with a blank state.
+    /// 2. Adds random walls within the grid based on a predefined wall density constant (`WALL_DENSITY`).
+    /// 3. Sets the outer edges of the grid as walls to form boundaries.
+    /// 4. Finds and identifies distinct areas (disjoint regions) within the grid.
+    /// 5. Iteratively removes one wall from each distinct area until only one connected area remains.
+    ///
     pub fn auto_set_walls(&mut self) {
         self.clear_walls();
 
@@ -197,14 +240,27 @@ impl Map {
         }
     }
 
+    /// Removes one wall per area.
+    ///
+    /// This function iterates over a collection of areas.
+    /// For each tile in an area, it checks the neighboring tiles and removes one wall (up, right, down, or left)
+    /// that separates the current area from another area. By doing so, it ensures there is a path connecting
+    /// adjacent areas.
+    ///
+    /// # Parameters
+    /// - `&mut self`: The mutable reference to the struct instance containing the `tiles` grid and its dimensions.
+    /// - `mut areas: &mut Vec<Vec<(usize, usize)>>`: A mutable reference to a vector of areas, where each area is
+    ///   represented as a vector of `(x, y)` coordinates corresponding to tiles in the grid.
+    ///
     fn remove_one_wall_per_area(&mut self, mut areas: &mut Vec<Vec<(usize, usize)>>) {
         for area in areas.iter().take(areas.len() - 1) {
+            // find one wall to remove (look in each tile of the area) -> break if found & removed
             for tile_coord in area {
                 let x = tile_coord.0;
                 let y = tile_coord.1;
                 let index = y * self.tiles_x + x;
-                let index_right = y * self.tiles_x + (x + 1);
-                let index_down = (y + 1) * self.tiles_x + x;
+                let index_right = y * self.tiles_x + (x + 1); // right neighbor
+                let index_down = (y + 1) * self.tiles_x + x; // down neighbor
                 if y > 0
                     && self.tiles[index].up
                     && !area.contains(&(tile_coord.0, tile_coord.1 - 1))
@@ -239,6 +295,8 @@ impl Map {
         }
     }
 
+
+    /// Clears all the walls for each tile in the current collection.
     pub fn clear_walls(&mut self) {
         for tile in &mut self.tiles {
             tile.up = false;
@@ -248,6 +306,18 @@ impl Map {
         }
     }
 
+    /// Adds random walls to the tiles in the grid based on the specified density.
+    ///
+    /// This function assigns random walls (`up` and `left`) to each tile in the grid.
+    /// To ensure no overlapping or double walls between tiles, only the `up` and `left`
+    /// directions are considered for each tile. The probability of a wall being assigned
+    /// is governed by the `density` parameter, which is clamped between `0.0` and `1.0`.
+    ///
+    /// # Parameters
+    /// - `density` (`f32`): The density of walls to be added. A value of `0.0` means no
+    ///   walls will be added, while `1.0` means every tile will receive walls in the `up`
+    ///   and `left` directions.
+    ///
     pub fn add_random_walls(&mut self, density: f32) {
         // Add random walls based on the density (only up and left walls to avoid double walls)
         for tile in &mut self.tiles {
@@ -256,6 +326,16 @@ impl Map {
         }
     }
 
+
+    /// Finds and returns distinct areas within a grid.
+    ///
+    /// This method iterates over all tiles in a grid represented by `self.tiles_x` (width) and `self.tiles_y` (height).
+    /// It identifies connected regions (areas) using a flood-fill algorithm, marking visited tiles as it proceeds to
+    /// ensure areas are distinct and non-overlapping.
+    ///
+    /// Each area is represented as a `Vec<(usize, usize)>`, where each tuple corresponds to the `(x, y)` coordinates of
+    /// the tiles belonging to that area. The method returns a vector of these areas.
+    ///
     pub fn find_distinct_areas(&self) -> Vec<Vec<(usize, usize)>> {
         let mut visited = vec![false; self.tiles_x * self.tiles_y];
         let mut areas = Vec::new();
@@ -274,6 +354,20 @@ impl Map {
         areas
     }
 
+    /// Performs a flood-fill algorithm to identify a connected area in a grid starting from the provided coordinates.
+    ///
+    /// This method recursively explores neighboring tiles in the grid to determine all tiles that are part of
+    /// a contiguous region without walls blocking the way.
+    ///
+    /// # Parameters
+    /// - `x`: The x-coordinate of the starting tile in the grid.
+    /// - `y`: The y-coordinate of the starting tile in the grid.
+    /// - `visited`: A mutable vector of booleans representing whether a specific tile in the grid
+    ///   has already been visited. Its length should be `self.tiles_x * self.tiles_y`.
+    /// - `area`: A mutable vector containing tuples of `(usize, usize)`
+    ///   representing coordinates of tiles in the connected area. The function will populate this vector
+    ///   with all tiles that belong to the same contiguous area as the starting tile.
+    ///
     fn flood_fill(
         &self,
         x: usize,
@@ -306,11 +400,9 @@ impl Map {
         if y > 0 && !tile.up {
             self.flood_fill(x, y - 1, visited, area);
         }
-        // if x < self.tiles_x - 1 && !tile.right {
         if x < self.tiles_x - 1 && !tile.right && !tile_right.left {
             self.flood_fill(x + 1, y, visited, area);
         }
-        // if y < self.tiles_y - 1 && !tile.down {
         if y < self.tiles_y - 1 && !tile.down && !tile_down.up {
             self.flood_fill(x, y + 1, visited, area);
         }
@@ -320,33 +412,12 @@ impl Map {
     }
 }
 
+/// Generates a random floating-point number between 0.0 and 1.0.
 fn random_float() -> f32 {
     (get_u64() as f32) / (u64::MAX as f32)
 }
 
-// Helper function to check if two line segments intersect
-fn line_intersects_line(
-    x1: isize,
-    y1: isize,
-    x2: isize,
-    y2: isize,
-    x3: isize,
-    y3: isize,
-    x4: isize,
-    y4: isize,
-) -> bool {
-    let denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
-
-    if denom == 0 {
-        return false; // Lines are parallel
-    }
-
-    let ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) as f64 / denom as f64;
-    let ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) as f64 / denom as f64;
-
-    ua >= 0.0 && ua <= 1.0 && ub >= 0.0 && ub <= 1.0
-}
-
+/// Serializable implementation for Map
 impl Serializable for Map {
     fn serialize(&self) -> Vec<u8> {
         let mut result = Vec::new();
