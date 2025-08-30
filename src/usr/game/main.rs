@@ -26,6 +26,7 @@ pub static DROP_PROBABILITY: f64 = 0.0; // 10% packet loss
 
 static mut RNG_STATE: u64 = 12345;
 
+/// Generates a pseudo-random floating-point number between 0.0 and 1.0.
 fn simple_random() -> f64 {
     unsafe {
         RNG_STATE = RNG_STATE.wrapping_mul(1103515245).wrapping_add(12345);
@@ -33,6 +34,25 @@ fn simple_random() -> f64 {
     }
 }
 
+/// Main entry point for the game application.
+///
+/// This function parses command-line arguments to determine the execution mode and
+/// starts either a server instance, a client instance, or displays help information.
+/// It supports server mode, client mode with configurable IP addresses, and a map
+/// demonstration mode.
+///
+/// # Parameters
+/// - `args`: A slice of string slices containing the command-line arguments
+///
+/// # Returns
+/// - `Ok(())` if the application executed successfully
+/// - `Err(ExitCode)` if an error occurred or invalid arguments were provided
+///
+/// # Supported Arguments
+/// - `-h, --help`: Display help information
+/// - `-s, --server`: Start in server mode
+/// - `-ip=<digit>`: Start as client with IP 192.168.0.<digit> (digit must be 2-255)
+/// - `-m, --mapdemo`: Start the map generation demonstration
 pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     if args.iter().any(|&arg| arg == "-h" || arg == "--help") {
         return help();
@@ -71,6 +91,28 @@ pub fn main(args: &[&str]) -> Result<(), ExitCode> {
     }
 }
 
+/// Starts the game client with the specified IP configuration.
+///
+/// This function initializes a game client that connects to a server, receives
+/// game state updates, sends user input, and renders the game. The client handles
+/// network communication, user input processing, and game state synchronization
+/// with the server.
+///
+/// # Parameters
+/// - `ip_digit`: An optional byte representing the last octet of the client's IP address.
+///   If provided, the client will use IP 192.168.0.<ip_digit>. If None, a default IP is used.
+///
+/// # Returns
+/// - `Ok(())` if the client shut down cleanly
+/// - `Err(ExitCode)` if an error occurred during client execution
+///
+/// # Game Loop
+/// The client runs in a continuous loop that:
+/// 1. Requests and receives map data from the server
+/// 2. Handles incoming network messages (game state updates, etc.)
+/// 3. Processes user input (keyboard and mouse)
+/// 4. Sends input data to the server
+/// 5. Updates and renders the game state
 pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
     let mut game = crate::usr::game::tanks::game::Game::new(WIDTH, HEIGHT);
     let mut network_handler = NetworkHandler::new();
@@ -178,6 +220,24 @@ pub fn client(ip_digit: Option<u8>) -> Result<(), ExitCode> {
     }
 }
 
+/// Starts the game server that manages multiplayer game sessions.
+///
+/// This function initializes a game server that accepts client connections,
+/// processes player input from multiple clients, updates the authoritative
+/// game state, and broadcasts state updates to all connected clients.
+/// The server operates as the central authority for game logic and state.
+///
+/// # Returns
+/// - `Ok(())` if the server shut down cleanly
+/// - `Err(ExitCode)` if an error occurred during server execution
+///
+/// # Server Responsibilities
+/// The server handles:
+/// - Client connection management (connect/disconnect)
+/// - Processing player input from all clients
+/// - Authoritative game state updates (physics, collisions, etc.)
+/// - Broadcasting game state to all clients at a fixed rate
+/// - Map data distribution to new clients
 pub fn server() -> Result<(), ExitCode> {
     let mut game = crate::usr::game::tanks::game::Game::new(WIDTH, HEIGHT);
     let mut network_handler = NetworkHandler::new();
@@ -238,6 +298,27 @@ pub fn server() -> Result<(), ExitCode> {
     }
 }
 
+/// Processes all incoming network messages and updates the game state accordingly.
+///
+/// This function polls for incoming network messages and dispatches them based on
+/// their message type. It handles different types of messages including map data,
+/// player input, game state updates, and client connection/disconnection events.
+/// The function also simulates network conditions such as packet loss for testing.
+///
+/// # Parameters
+/// - `game`: A mutable reference to the game instance that will be updated based on received messages
+/// - `network_handler`: A mutable reference to the network handler used for message polling
+///
+/// # Returns
+/// - `Ok(())` if all messages were processed successfully
+/// - `Err(String)` if an error occurred during message processing
+///
+/// # Message Types Handled
+/// - `MapData`: Updates the game map from server data
+/// - `PlayerInput`: Processes input from remote players (server-side)
+/// - `GameStateUpdate`: Updates local game state from server (client-side)
+/// - `Connect`: Handles new client connections (server-side)
+/// - `Disconnect`: Handles client disconnections (server-side)
 fn handle_network_messages(
     game: &mut crate::usr::game::tanks::game::Game,
     network_handler: &mut NetworkHandler,
@@ -303,6 +384,19 @@ fn handle_network_messages(
     Ok(())
 }
 
+/// Handles the connection of a new client to the server.
+///
+/// # Parameters
+/// - `game`: A mutable reference to the game instance where the new player will be added
+/// - `sender`: Network metadata containing the client's connection information
+///
+/// # Returns
+/// - `Ok(())` if the client was successfully added to the game
+/// - `Err(String)` if an error occurred during client addition
+///
+/// # Player ID Assignment
+/// The player ID is determined by the last octet of the client's IPv4 address.
+/// For example, a client with IP 192.168.0.5 will have player ID 5.
 fn handle_new_client_connection(
     game: &mut crate::usr::game::tanks::game::Game,
     sender: smoltcp::socket::udp::UdpMetadata,
@@ -323,6 +417,7 @@ fn handle_new_client_connection(
     Ok(())
 }
 
+/// Handles the disconnection of a client from the server.
 fn handle_disconnected_client(
     game: &mut crate::usr::game::tanks::game::Game,
     player_id: usize,
@@ -331,6 +426,24 @@ fn handle_disconnected_client(
     Ok(())
 }
 
+/// Sends the local player's input data to the server.
+///
+/// This function serializes the specified player's current input state (movement,
+/// shooting, mouse position) and transmits it to the server for processing.
+/// It includes packet loss simulation for testing network resilience.
+///
+/// # Parameters
+/// - `game`: A reference to the game instance containing the player's input data
+/// - `network_handler`: A mutable reference to the network handler for message transmission
+/// - `player_id`: The unique identifier of the player whose input should be sent
+///
+/// # Returns
+/// - `Ok(())` if the input data was sent successfully (or simulated as lost)
+/// - `Err(String)` if an error occurred during input transmission
+///
+/// # Network Simulation
+/// This function may simulate packet loss based on the global `DROP_PROBABILITY`
+/// constant, dropping the packet without sending it to test network resilience.
 fn send_user_input_to_server(
     game: &crate::usr::game::tanks::game::Game,
     network_handler: &mut NetworkHandler,
@@ -348,6 +461,26 @@ fn send_user_input_to_server(
         .map_err(|e| format!("Failed to send user input: {}", e))
 }
 
+/// Broadcasts the current game state to all connected clients.
+///
+/// This function serializes the complete game state (including all players, bullets,
+/// and other game objects) and sends it to all connected clients.
+/// 
+/// # Parameters
+/// - `game`: A reference to the game instance containing the current authoritative state
+/// - `network_handler`: A mutable reference to the network handler for broadcasting
+///
+/// # Returns
+/// - `Ok(())` if the game state was broadcast successfully (or simulated as lost)
+/// - `Err(String)` if an error occurred during state transmission
+///
+/// # Network Simulation
+/// This function may simulate packet loss based on the global `DROP_PROBABILITY`
+/// constant, dropping the packet without sending it to test network resilience.
+///
+/// # Usage
+/// This function is typically called by the server at regular intervals (defined by
+/// `BROADCAST_RATE`) to keep all clients synchronized with the authoritative game state.
 fn broadcast_game_state_to_clients(
     game: &crate::usr::game::tanks::game::Game,
     network_handler: &mut NetworkHandler,
@@ -364,6 +497,7 @@ fn broadcast_game_state_to_clients(
         .map_err(|e| format!("Failed to broadcast game state: {}", e))
 }
 
+/// Displays help information for the game application.
 pub fn help() -> Result<(), ExitCode> {
     let csi_option = Style::color("aqua");
     let csi_title = Style::color("yellow");

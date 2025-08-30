@@ -1,7 +1,55 @@
-\chapter{Kapitelname}
+\begin{section}{Analyse und Bewertung}
 
-Text
+Nach der erfolgreichen Implementierung des verteilten Spiels wurde dessen Leistungsfähigkeit und Stabilität unter verschiedenen Bedingungen analysiert.
+Die Bewertung konzentrierte sich auf drei Kernbereiche: die Skalierbarkeit hinsichtlich der Spieleranzahl, die Robustheit gegenüber unzuverlässigen Netzwerkverbindungen und die theoretischen Limitierungen des gewählten Netzwerkprotokolls.
 
-\section{Sectionname}
+\begin{subsection}{Skalierbarkeit und Systemlast}
+Ein initialer Test zielte darauf ab, die maximale Anzahl an gleichzeitig unterstützten Spielern zu ermitteln.
+In einer lokalen Testumgebung, in der ein Server und mehrere Clients als separate QEMU-Instanzen auf einem einzigen Host-Rechner ausgeführt wurden, konnte das Spiel mit bis zu acht Clients, also insgesamt neun Spielinstanzen, stabil betrieben werden.
 
-Text
+Die praktische Obergrenze wurde dabei nicht durch die Spiellogik oder das Netzwerkprotokoll selbst bestimmt, sondern durch zwei externe Faktoren:
+\begin{enumerate}
+    \item \textbf{Ressourcen des Host-Systems:} Der Betrieb von neun vollständigen Betriebssystem-Instanzen in QEMU führte zu einer erheblichen CPU- und Arbeitsspeicherlast auf dem Host-Rechner, was die primäre Hürde für die Erweiterung auf noch mehr Spieler darstellte.
+    \item \textbf{Limitierungen der Benutzeroberfläche:} Das implementierte Head-Up-Display (HUD) war für eine maximale Anzeige von acht Spielern und deren Punkteständen ausgelegt. Eine höhere Spielerzahl hätte eine Anpassung der grafischen Oberfläche erfordert.
+\end{enumerate}
+Diese Ergebnisse zeigen, dass die Kernarchitektur des Spiels ausreichend performant ist, um eine beachtliche Spielerzahl zu verwalten, und dass die Skalierbarkeit in der Praxis eher von der verfügbaren Hardware und sekundären UI-Komponenten abhängt.
+
+\end{subsection}
+
+\begin{subsection}{Verhalten bei Paketverlust}
+Um die Robustheit der Netzwerkarchitektur zu untersuchen, wurde ein Experiment durchgeführt, bei dem der Server künstlich verschlechterte Netzwerkbedingungen simulierte.
+Dazu wurde der Server so modifiziert, dass er ausgehende \texttt{GameStateUpdate}-Pakete mit einer Wahrscheinlichkeit von 30\,\% zufällig verwirft.
+Dieses Szenario simuliert eine unzuverlässige Netzwerkverbindung (z.B. WLAN mit Störungen).
+
+Die Beobachtungen bestätigten die Wirksamkeit der gewählten Architektur, insbesondere der clientseitigen Berechnung:
+\begin{itemize}
+    \item \textbf{Sicht des aktiven Spielers:} Der Spieler, dessen Client mit dem Server verbunden war, erlebte weiterhin eine flüssige und reaktionsschnelle Steuerung seiner eigenen Spielfigur. Dies liegt daran, dass die Client-Eingaben zuverlässig an den Server gesendet wurden und die lokale Darstellung (\emph{Rendering}) des Clients unabhängig vom Empfang der Server-Updates erfolgte.
+    \item \textbf{Sicht der anderen Spieler:} Aus der Perspektive der anderen Clients erschien die Bewegung der Spielfigur des aktiven Spielers abgehakt und sprunghaft. Da diese Clients nur unregelmäßig Positionsupdates erhielten, basierte ihre Darstellung auf veralteten Daten. Sobald ein neues Paket ankam, wurde die Position der Spielfigur korrigiert, was zu sichtbaren "Teleportationen" führte.
+    \item \textbf{Projektil-Synchronisation:} Bemerkenswerterweise blieben die Flugbahnen der Projektile auf \emph{allen} Clients flüssig und korrekt synchronisiert. Da die Clients die gesamte Flugbahn nach Erhalt der initialen Schussdaten selbst berechnen, war die Darstellung der Projektile von den sporadischen \texttt{GameStateUpdate}-Paketen entkoppelt. Dieses Ergebnis unterstreicht eindrucksvoll den Vorteil, rechenintensive, aber deterministische Prozesse auf den Client auszulagern, um die Auswirkungen von Netzwerklatenz und Paketverlust zu minimieren.
+\end{itemize}
+
+\end{subsection}
+
+\begin{subsection}{Theoretische Limitationen durch UDP}
+Die Wahl von UDP als Transportprotokoll bringt den Vorteil geringer Latenz mit sich, unterliegt aber auch Beschränkungen, insbesondere hinsichtlich der Paketgröße.
+Um eine Fragmentierung auf der IP-Ebene zu vermeiden, sollte die Größe eines UDP-Datagramms die \textbf{Maximum Transmission Unit (MTU)} des Netzwerks nicht überschreiten. Für Ethernet liegt dieser Wert typischerweise bei 1500 Bytes. Wird ein UDP-Paket fragmentiert und geht auch nur ein einziges Fragment verloren, wird das gesamte Paket vom Empfänger verworfen. Daher wurde das Protokoll so gestaltet, dass ein vollständiger \texttt{GameState} in ein einziges, unfragmentiertes Paket passt.
+
+Die Analyse der Paketgrößen ergab folgende Werte:
+\begin{itemize}
+    \item \textbf{UserInput:} 9 Bytes (1 Byte für Flags, 8 Bytes für Mauskoordinaten).
+    \item \textbf{GameState (Header):} ca. 60 Bytes für grundlegende Spielinformationen.
+    \item \textbf{Spieler-Daten:} ca. 40 Bytes pro Spieler (ID, Position, Punkte etc.).
+    \item \textbf{Projektil-Daten:} 24 Bytes pro Projektil (Startposition, Richtung, Schützen-ID).
+\end{itemize}
+
+Unter Berücksichtigung eines MTU von 1500 Bytes und des Overheads für IP- (20 Bytes) und UDP-Header (8 Bytes) verbleiben ca. 1472 Bytes für die Nutzdaten.
+Daraus lassen sich die theoretischen Obergrenzen für die Skalierbarkeit des Spiels pro Update-Paket ableiten:
+\begin{itemize}
+    \item \textbf{Maximale Spielerzahl:} $(1472 - 60) / 40 \approx 35$. Es können die Zustände von maximal 35 Spielern gleichzeitig übertragen werden, sofern keine Projektile im Spiel sind.
+    \item \textbf{Maximale Projektilanzahl:} $(1472 - 60 - 40) / 24 \approx 57$. Bei einem einzelnen Spieler können die Zustände von bis zu 57 aktiven Projektilen in einem Paket übermittelt werden.
+\end{itemize}
+Diese Berechnungen definieren die harten Grenzen des Systems. Ein Überschreiten dieser Werte würde zwangsläufig zu Paketfragmentierung führen und die Stabilität des Spiels bei unzuverlässigen Verbindungen gefährden. Die gewählte Strategie, Pakete kompakt zu halten und Berechnungen auf den Client zu verlagern, erweist sich somit als entscheidend, um innerhalb dieser Grenzen zu operieren.
+
+\end{subsection}
+
+\end{section}
