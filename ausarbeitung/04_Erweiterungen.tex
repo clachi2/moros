@@ -1,145 +1,107 @@
 \begin{section}{Erweiterungen für MOROS}
-\label{sec:erweiterungen}
 
-Um ein interaktives, verteiltes Spiel auf MOROS zu realisieren, waren mehrere Systemerweiterungen nötig:
-(1) eine PS/2-Maus\-unterstützung inklusive IRQ-Handler und Event-Queue,
-(2) ein einfacher Framebuffer mit Zeichenprimitiven und Textausgabe,
-(3) Ergänzungen und Bugfixes im UDP-Stack (\texttt{listen}-Methode und zuverlässigeres \texttt{write}),
-sowie (4) Kernel-nahe Debug-Hilfen (\texttt{kprint!}/\texttt{kprintln!}).
-Diese Bausteine bilden das Fundament für Eingabe, Ausgabe und Netzwerk des Spiels.
-Eine ähnliche Übersicht wurde bereits in unserem Vortrag gegeben.
+Damit MOROS die Grundlage für ein interaktives und verteiltes Spiel werden konnte, mussten mehrere Komponenten ergänzt oder erweitert werden.
+Im Ausgangszustand bietet MOROS lediglich eine Shell, ein Dateisystem und rudimentäre Netzwerkunterstützung.
+Folgende Erweiterungen waren notwendig, um die Spielmechanik und die Netzwerkkommunikation umzusetzen:
 
-\begin{subsection}{Framebuffer: Grafikprimitive und Text}
-\label{subsec:fb}
-Der Framebuffer ist als rein userspace-seitig beschriebenes Bytefeld implementiert, das über \texttt{flush()} atomar in das vom Treiber beobachtete Gerätedatei-Interface geschrieben wird.
-Die Struktur kapselt Auflösung, Farbtiefe (hier: 8 Bit/Pixel) und \emph{pitch} (Bytes pro Zeile):
-\begin{verbatim}
-pub struct Framebuffer {
-    width, height, color_depth, pitch, file_path, internal_buffer, buffer_size
-}
-\end{verbatim}
+\begin{itemize}
+    \item \textbf{Framebuffer:} für die grafische Darstellung von Spielfeld, Spielern und Objekten.
+    \item \textbf{PS/2-Maus:} um eine zweite Eingabequelle neben der Tastatur zu haben und Zielen/Schießen zu ermöglichen.
+    \item \textbf{UDP-Erweiterungen:} um Kommunikation zwischen Server und Clients über das Netzwerk zu ermöglichen.
+    \item \textbf{Debugging-Ausgaben:} zur Fehleranalyse und Entwicklung.
+\end{itemize}
 
-\paragraph{Speicherlayout und Flush.}
-\texttt{pitch = width * (color\_depth / 8)}; der interne Puffer hat exakt \texttt{height * pitch} Bytes.
-\texttt{flush()} persistiert den gesamten Puffer:
-\begin{verbatim}
-pub fn flush(&self) {
-    write(self.file_path, &self.internal_buffer).expect("...");
-}
-\end{verbatim}
-Damit ist die Ausgabe wohldefiniert (kein „tearing“ durch Teilwrites).
+Alle diese Komponenten sind eng in den Betriebssystemkern eingebunden und wurden gezielt für die Spielentwicklung ergänzt.
+Im Folgenden werden die Erweiterungen im Detail beschrieben.
 
-\paragraph{Primitive: Pixel, Linie, Rechteck, Kreis.}
-\texttt{draw\_pixel} prüft Grenzen und schreibt ein Byte (Farbindex) an \texttt{y * pitch + x}.
-\texttt{draw\_line} nutzt den Bresenham-Algorithmus (integerbasiert, verzicht auf Floating-Point im Hotpath),
-\texttt{draw\_rectangle} füllt O(\,Breite\,$\times$\,Höhe\,) Pixel,
-\texttt{draw\_circle} implementiert die Midpoint-Variante; bei \texttt{filled=true} werden horizontale Spans gezeichnet:
-\begin{verbatim}
-self.draw_line(cx - x, cy + y, cx + x, cy + y, color);
-... // vier Symmetrieachsen
-\end{verbatim}
+\begin{subsection}{Framebuffer}
+Ein \textbf{Framebuffer} ist ein Bereich im Speicher, der direkt die Bildschirmausgabe repräsentiert.
+Jedes Byte (bzw. jedes Pixel) im Framebuffer entspricht einem Bildpunkt auf dem Monitor.
+Das System zeichnet, indem es Werte in diesen Speicher schreibt.
 
-\paragraph{Textausgabe mit Bitmap-Font und Skalierung.}
-Die Funktion \texttt{draw\_text} iteriert über \texttt{font.data} (8 Spalten pro Zeichenzeile) und setzt Pixel dort,
-wo das Bitmuster 1 ist. Das optionale \texttt{scale} vergrößert Abstände und Pixelpositionen:
-\begin{verbatim}
-if (row >> (7 - dx)) & 1 == 1 {
-    let px = (cursor_x + dx as f32 * scale) as isize;
-    let py = (y as f32 + dy as f32 * scale) as isize;
-    self.draw_pixel(px, py, color);
-}
-\end{verbatim}
-\textbf{Hinweis (aktueller Stand):} Skalierung $>1$ repliziert Pixel nicht flächig (kein „Block-Fill“),
-sondern setzt versetzte Einzelpixel; sehr kleine Skalen (<1) können Lücken erzeugen.
-Für UI-Text im Spiel (Stats links, Koordinatenraster) genügt das, eine echte „Nearest-Neighbor“-Skalierung wäre jedoch eine sinnvolle Erweiterung.
+In MOROS wird der Pointer auf den Videospeicher bereits bereitgestellt.
+Unser Framebuffer-Modul kapselt diesen Speicher jedoch in einer \texttt{struct}, die folgende Daten speichert:
+\begin{itemize}
+    \item Breite und Höhe der Darstellung.
+    \item Farbtiefe (hier: 8 Bit, also ein Byte pro Pixel).
+    \item \texttt{pitch} (Bytes pro Zeile).
+    \item Einen internen Puffer als \texttt{Vec<u8>}, auf dem alle Zeichenoperationen stattfinden.
+\end{itemize}
 
-\paragraph{Komposition: \texttt{copy\_from} und \texttt{copy\_from\_at}.}
-Für HUD/Offscreen-Buffering können Inhalte kopiert werden.
-\texttt{copy\_from\_at} iteriert zeilenweise und kopiert Byte-für-Byte;
-bei 8-Bit-Farbtiefe ist das korrekt, für höhere Farbtiefen müsste die Schleife auf \texttt{bytes\_per\_pixel} erweitert werden (derzeit nicht nötig).
-\end{subsection}
+Der Puffer wird über \texttt{flush()} atomar in den tatsächlichen Framebuffer von MOROS kopiert.
+So wird immer ein vollständiges Bild ausgegeben, ohne dass während der Berechnung Artefakte entstehen.
 
-\begin{subsection}{PS/2-Maus: IRQ-Handler und Event-Queue}
-\label{subsec:mouse}
-Wir initialisieren den PS/2-Controller, aktivieren den zweiten Port und konfigurieren IRQ12.
-Die Initialisierung sendet klassische PS/2-Kommandos: \texttt{0xA8} (Enable second PS/2), \texttt{0x20}/\texttt{0x60} (Config read/write),
-\texttt{0xD4} (Write to mouse) und \texttt{0xF4} (Enable data reporting).
-Eben diese Schritte sowie die Nutzung einer Queue wurden im Vortrag als Voraussetzung genannt.
+Der Framebuffer unterstützt verschiedene Funktionen:
+\begin{itemize}
+    \item \textbf{Pixel setzen:} direktes Setzen einer Farbe an einer Position.
+    \item \textbf{Linien zeichnen:} implementiert mit dem Bresenham-Algorithmus.
+    \item \textbf{Rechtecke zeichnen:} sowohl Umrandung als auch Füllung möglich.
+    \item \textbf{Kreise zeichnen:} mit oder ohne Füllung.
+    \item \textbf{Textausgabe:} mit einem Bitmap-Font, inklusive Skalierung.
+    \item \textbf{Bitmaps rendern:} Laden und Zeichnen kleiner Bilder, z.\,B. für Spielfiguren.
+\end{itemize}
 
-\paragraph{Interrupt-Pfad.}
-Der IRQ-Handler ruft \texttt{internal\_irq\_handler()}, das genau ein Dreibyte-Paket (\texttt{[status, dx, dy]})
-aus den Ports \texttt{0x64}/\texttt{0x60} liest, prüft \emph{Output Buffer Full} und \emph{Always-1}-Bit,
-und liefert ein \texttt{MouseEvent}:
-\begin{verbatim}
-Some(MouseEvent {
-    x_movement: mouse_data[1] as i8,
-    y_movement: -(mouse_data[2] as i8), // y-Achse invertiert
-    buttons: mouse_data[0] & 0x07,
-})
-\end{verbatim}
-
-\paragraph{Lockfreie Event-Queue.}
-Zur Übergabe in den Spiel-Loop wird ein MPMC-Queue (bounded SCQ, Kapazität 128) verwendet:
-\begin{verbatim}
-let (receiver, sender) = mpmc::bounded::scq::queue(128);
-sender.try_enqueue(event).ok();
-\end{verbatim}
-Der Client ruft \texttt{get\_last\_event()} (nicht-blockierend) oder \texttt{wait\_for\_event()} (blockierend) auf.
-Die bounded Queue bietet deterministisches Verhalten ohne Heap-Wachstum und vermeidet Spinlocks im Hotpath.
-
-\paragraph{Fehlertoleranz.}
-Ist der Receiver geschlossen, wird defensiv abgebrochen (\texttt{panic!});
-im produktiven Kernel wäre hier ein definierter Fallback wünschenswert.
-Für das Seminar-Setup genügt das strikte Verhalten.
-\end{subsection}
-
-\begin{subsection}{UDP-Erweiterungen und Bugfixes}
-\label{subsec:udp}
-Für das verteilte Spiel benötigen wir zuverlässige, eng getaktete UDP-Send/Receive-Zyklen.
-In MOROS ergänzen wir dazu \texttt{listen(port)} und korrigieren die Semantik von \texttt{write()},
-so dass nach einem Send nicht „zu früh“ aus der Poll-Schleife ausgestiegen wird—ein Problem, das im Vortrag als Fehlerbild (Sekunden-lange Sendepausen) beschrieben wurde.
-
-\paragraph{\texttt{listen(port)}.}
-Die Funktion bindet den Socket, sobald dieser \emph{nicht} offen ist, und \emph{pollt} die Netzwerkschicht deterministisch:
-\begin{verbatim}
-let local = IpListenEndpoint::from(port);
-socket.bind(local).map_err(|_| ())?;
-\end{verbatim}
-Zwischenpolling über \texttt{iface.poll\_delay(...)} und \texttt{halt()} verhindert Busy-Waiting,
-ein Timeout schützt vor Hängern (hier 5\,s).
-
-\paragraph{\texttt{write()}: zuverlässiger Sendeabschluss.}
-\emph{Vorher} wurde nach dem ersten \texttt{send\_slice} ein Flag \texttt{sent} gesetzt und erst \emph{im nächsten} Poll-Durchlauf verlassen,
-wodurch unter Last Sends „liegenbleiben“ konnten.
-\emph{Nachher} pollt die Funktion \emph{sofort} erneut und bricht dann sauber ab:
-\begin{verbatim}
-if socket.can_send() {
-    socket.send_slice(buf, endpoint)?;
-    iface.poll(...); // sofortiger Fortschritt
-    break;
-}
-\end{verbatim}
-Damit werden Sendefenster zügig geleert; Timeouts und \texttt{poll\_delay} bleiben als Backpressure-Mechanismen erhalten.
-\end{subsection}
-
-\begin{subsection}{Debugging-Hilfen}
-\label{subsec:debug}
-Zur Diagnose im Kernelmodus verwenden wir \texttt{kprint!} und \texttt{kprintln!} (aus TOSR übernommen),
-um frühe Boot- und Interruptpfade zu beobachten.
-Im Vortrag sind diese Hilfen als separate Erweiterung aufgeführt; sie waren während der Netzwerk- und PS/2-Entwicklung essenziell.
-\end{subsection}
-
-\begin{subsection}{Zusammenfassung und Grenzen}
-Die beschriebenen Bausteine liefern genau das, was das Spiel benötigt:
-\emph{Frame\-buffer}-Zeichenprimitiven für Map/Spieler/Bullets,
-\emph{Maus}-Events für Zielen/Schießen,
-sowie \emph{UDP} für die State-Synchronisation.
-Aktuelle Grenzen sind:
-(1) 8-Bit-Farbpalette (bewusst, aber limitiert),
-(2) einfache Textskalierung ohne Block-Fill,
-(3) defensive \texttt{panic!}-Strategie bei Queue-Fehlern,
-(4) UDP ohne Fragmentierungsstrategien (vgl. Analysekapitel).
-Diese Punkte sind bewusst gewählte Vereinfachungen zugunsten eines stabilen, verständlichen Systems und decken sich mit der im Vortrag skizzierten Pragmatik.
+Damit liefert der Framebuffer die grafische Grundlage für die Darstellung von Spielfeld, Spielern, Bullets und Spielstatistiken.
 
 \end{subsection}
+
+\begin{subsection}{PS/2-Maus}
+Für das Zielen und Schießen im Spiel war eine zweite Eingabemöglichkeit notwendig.
+Dazu wurde eine vollständige PS/2-Maus-Unterstützung in MOROS ergänzt.
+
+\paragraph{Initialisierung.}
+MOROS bietet eine Schnittstelle, um Interrupt-Handler zu registrieren.
+Für die Maus wird der IRQ12 (PS/2-Port) über folgende Schritte initialisiert:
+\begin{itemize}
+    \item Aktivieren des zweiten PS/2-Ports mit Befehl \texttt{0xA8}.
+    \item Konfiguration des Controllers und Aktivieren von IRQ12.
+    \item Senden des Befehls \texttt{0xF4}, um die Maus in den Datenmodus zu versetzen.
+\end{itemize}
+
+\paragraph{Interrupt-Verarbeitung.}
+Bei jedem Interrupt werden drei Bytes von den Ports \texttt{0x64}/\texttt{0x60} gelesen.
+Diese enthalten Buttons, X-Bewegung und Y-Bewegung.
+Die Daten werden in ein \texttt{MouseEvent} umgewandelt, das die Buttons und Bewegungsdeltas enthält.
+
+\paragraph{Ereignis-Queue.}
+Da Mausbewegungen asynchron eintreffen, speichern wir sie in einer lockfreien Queue (MPMC).
+Der Spiel-Loop kann so jederzeit das letzte Event abfragen oder blockierend auf ein neues Event warten.
+Dies entkoppelt die schnelle IRQ-Verarbeitung von der Spiel-Logik.
+
+\end{subsection}
+
+\begin{subsection}{UDP-Erweiterungen}
+Für die Netzwerkverteilung des Spiels war UDP entscheidend, da es schnelle und kompakte Nachrichten erlaubt.
+MOROS brachte jedoch keine vollständige Implementierung mit.
+
+\paragraph{\texttt{listen}-Methode.}
+Eine Funktion \texttt{listen(port)} wurde ergänzt, um einen Socket auf einen Port zu binden.
+Ohne diese Methode hätte der Server keine eingehenden Nachrichten annehmen können.
+Die Funktion pollt so lange, bis der Socket gebunden ist oder ein Timeout erreicht wird.
+
+\paragraph{Fehler in der \texttt{write}-Methode.}
+Die ursprüngliche \texttt{write}-Funktion sendete zwar ein Paket, verließ die Poll-Schleife aber zu früh.
+Dadurch konnten Nachrichten mitunter mehrere Sekunden hängen bleiben.
+Die korrigierte Version pollt nach dem Senden erneut und stellt sicher, dass das Paket den Stack vollständig verlassen hat.
+
+Diese Änderungen machten eine stabile Echtzeitkommunikation im Spiel erst möglich.
+
+\end{subsection}
+
+\begin{subsection}{Debugging-Ausgaben}
+Während der Entwicklung waren Debugging-Funktionen unverzichtbar.
+Dafür wurde die Serial-Unterstützung aus \emph{hhuTOSr} übernommen und die Makros \texttt{kprint!} und \texttt{kprintln!} in MOROS integriert.
+
+Damit lassen sich einfache Debug-Ausgaben direkt auf die Konsole schreiben, ähnlich wie \texttt{println!} in Rust.
+Diese Ausgaben halfen insbesondere bei:
+\begin{itemize}
+    \item der Fehlersuche in der Netzwerkkommunikation,
+    \item der Verfolgung von Interrupts (z.\,B. bei der Maus),
+    \item der Überprüfung der Framebuffer-Ausgabe.
+\end{itemize}
+
+Ohne diese Ausgaben wäre die Fehlersuche im Betriebssystemkern erheblich schwieriger gewesen.
+
+\end{subsection}
+
 \end{section}
