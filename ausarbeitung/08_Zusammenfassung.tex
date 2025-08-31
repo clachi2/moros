@@ -2,37 +2,32 @@
 
 Das Ziel dieses Seminarprojekts war es, die Erweiterbarkeit des minimalistischen, in Rust geschriebenen Betriebssystems MOROS durch die Entwicklung einer komplexen, interaktiven Anwendung unter Beweis zu stellen.
 Mit der erfolgreichen Implementierung eines verteilten Mehrspieler-Spiels konnte gezeigt werden, dass selbst eine stark reduzierte Systembasis als Fundament für anspruchsvolle, grafische Echtzeitanwendungen dienen kann.
-
 \begin{subsection}{Fazit}
 Die Realisierung des Projekts umfasste drei Kernbereiche.
 Zunächst wurden grundlegende Erweiterungen am MOROS-Kern vorgenommen, darunter die Implementierung einer PS/2-Maus-Schnittstelle zur Eingabeverarbeitung, die Entwicklung eines Framebuffers für die grafische Ausgabe und die Stabilisierung des vorhandenen UDP-Netzwerkstacks.
 Diese betriebssystemnahen Komponenten bildeten die notwendige Grundlage für jede Form von interaktiver Anwendung.
-
 Darauf aufbauend wurde das Spiel selbst mit einer modularen Architektur entwickelt.
 Kernmechanismen wie die prozedurale Generierung von zusammenhängenden Karten, eine präzise Kollisionserkennung und die deterministische Vorausberechnung von Geschossflugbahnen sorgten für ein robustes und gleichzeitig abwechslungsreiches Spielerlebnis.
 Die Trennung von Spiellogik und Systemkomponenten erwies sich als entscheidend für die Wartbarkeit und Erweiterbarkeit des Codes.
-
 Die dritte Säule des Projekts war die Verteilung des Spiels über eine Client-Server-Architektur.
 Durch den Einsatz von UDP konnte eine latenzarme Kommunikation realisiert werden.
 Strategien zur Minimierung der Netzwerklast, wie die manuelle Serialisierung und Kompaktierung von Datenpaketen sowie die Verlagerung von Berechnungen auf die Clients (\emph{Client-Side Prediction}), erwiesen sich als äußerst effektiv.
 Die durchgeführte Analyse bestätigte die Leistungsfähigkeit des Systems: Die Skalierbarkeit wurde in der Praxis weniger durch die Software-Architektur als durch die Hardwareressourcen des Host-Systems limitiert.
 Experimente mit simuliertem Paketverlust zeigten zudem eindrucksvoll, wie die clientseitige Berechnung die Auswirkungen von Netzwerkinstabilitäten auf das Spielerlebnis minimiert.
-
 Zusammenfassend demonstriert das Projekt erfolgreich, wie MOROS schrittweise von einem rein textbasierten System zu einer Plattform für grafische Netzwerkanwendungen erweitert werden kann.
 Die Arbeit verdeutlicht die Relevanz effizienter Protokolle und einer durchdachten Architektur bei der Entwicklung von verteilten Systemen.
 \end{subsection}
 
 \begin{subsection}{Ausblick}
 Obwohl das Projekt seine gesetzten Ziele erreicht hat, bietet es zahlreiche Anknüpfungspunkte für zukünftige Arbeiten und Verfeinerungen.
-
 Im Bereich der Netzwerkkommunikation könnte das Protokoll weiter verbessert werden.
 Anstatt den gesamten Spielzustand bei jeder Aktualisierung zu übertragen, könnte auf ein System umgestellt werden, das nur die Änderungen (\emph{Deltas}) seit dem letzten Zustand sendet.
+Diese als \emph{Delta Compression} bekannte Technik ist ein Standardverfahren zur Reduzierung der Bandbreitennutzung in Netzwerkspielen~\cite{fiedler2010snapshot}.
 Dies würde die Netzwerklast weiter reduzieren und potenziell mehr Spieler ermöglichen.
-Um die Darstellung entfernter Spieler bei Paketverlust flüssiger zu gestalten, könnten clientseitige Interpolations- und Extrapolationstechniken implementiert werden.
-
+Um die Darstellung entfernter Spieler bei Paketverlust flüssiger zu gestalten, könnten clientseitige Interpolations- und Extrapolationstechniken implementiert werden~\cite{unity_interpolation}.
 Die Spiellogik selbst bietet ebenfalls Raum für Erweiterungen.
-Denkbar wären die Einführung zusätzlicher Spielmechaniken wie Power-ups, verschiedener Waffentypen oder neuer Spielmodi (z.B. \emph{Capture the Flag}). Eine wesentliche Verbesserung der Immersion könnte durch die Implementierung von Sound-Treibern und Audio-Effekten in MOROS erreicht werden.
-
+Denkbar wären die Einführung zusätzlicher Spielmechaniken wie Power-ups, verschiedener Waffentypen oder neuer Spielmodi (z.B. \emph{Capture the Flag}).
+Eine wesentliche Verbesserung der Immersion könnte durch die Implementierung von Sound-Treibern und Audio-Effekten in MOROS erreicht werden.
 Auf einer übergeordneten Ebene könnten die für dieses Projekt entwickelten Systemerweiterungen – insbesondere der Framebuffer und die Maus-Unterstützung – als Grundlage für die Entwicklung einer einfachen grafischen Benutzeroberfläche oder anderer interaktiver Programme für MOROS dienen.
 Das Projekt kann somit auch als Fallstudie und Ausgangspunkt für weiterführende Lehr- und Forschungsprojekte im Bereich der Betriebssystementwicklung fungieren.
 \end{subsection}

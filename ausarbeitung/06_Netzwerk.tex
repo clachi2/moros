@@ -2,28 +2,24 @@
 
 Um aus dem lokal lauffähigen Prototyp ein Mehrspieler-Erlebnis zu schaffen, musste eine robuste Netzwerkarchitektur entwickelt werden.
 Die Herausforderung bestand darin, eine synchrone und performante Kommunikation zwischen mehreren Instanzen des Spiels zu gewährleisten, die auf dem minimalistischen Netzwerkstack von MOROS aufbaut.
-Die Implementierung folgte einer klassischen Client-Server-Architektur, bei der ein zentraler Server den Spielzustand verwaltet und die Clients die Ein- und Ausgabe der Spieler steuern.
-
+Die Implementierung folgte einer klassischen Client-Server-Architektur, bei der ein zentraler Server den Spielzustand verwaltet und die Clients die Ein- und Ausgabe der Spieler steuern~\cite{gambetta2014client_server}.
 \begin{subsection}{Testumgebung für verteilte Systeme}
 Die initiale Herausforderung war die Schaffung einer geeigneten Testumgebung.
 Ein verteiltes System, bestehend aus einem Server und mehreren Clients, erfordert ein Netzwerk, das die Kommunikation zwischen allen Teilnehmern ermöglicht.
 Die Standard-Netzwerkfunktionen von QEMU, wie \texttt{listen} und \texttt{connect}, sind primär für Punkt-zu-Punkt-Verbindungen (1:1) ausgelegt und daher für ein Mehrspieler-Szenario ungeeignet.
-
-Die Lösung wurde durch den Einsatz eines \textbf{Virtual Distributed Network (VDE)} realisiert.
+Die Lösung wurde durch den Einsatz eines \textbf{Virtual Distributed Network (VDE)} realisiert~\cite{vde_project}.
 VDE emuliert einen virtuellen Netzwerk-Switch, der auf dem Host-Betriebssystem läuft und über das Dateisystem ansprechbar ist (z.B. via \texttt{/tmp/moros}).
 Mehrere QEMU-Instanzen können ihre virtuellen Netzwerkkarten mit diesem VDE-Switch verbinden und so ein lokales Netzwerk (LAN) auf einem einzigen Host-Rechner simulieren.
 Um das Spiel über mehrere physische Laptops zu testen, wurde dieses Konzept erweitert: Auf jedem Host lief ein eigener VDE-Switch.
 Diese Switches wurden mittels \texttt{vde\_plug} über eine SSH-Verbindung miteinander gekoppelt, wodurch eine Brücke zwischen den lokalen virtuellen Netzwerken entstand.
 Diese Konfiguration ermöglichte es, Broadcast- und Multicast-Pakete zwischen den QEMU-Instanzen auf verschiedenen Hosts weiterzuleiten und so eine realitätsnahe Mehrspieler-Umgebung zu schaffen.
-
 \end{subsection}
 
 \begin{subsection}{Client-Server-Architektur und Spielablauf}
 Die grundlegende Architektur des Spiels trennt klar zwischen Server- und Client-Logik, obwohl beide auf derselben Codebasis aufbauen.
-
 Der \textbf{Server} fungiert als zentrale Autorität. Er ist allein verantwortlich für die Verwaltung des globalen Spielzustands (\emph{Game State}).
 Dazu gehören die Generierung der Map, die Positionen aller Spieler, der Zustand aller Projektile sowie die Punktestände.
-Der Server startet ohne Spieler und wartet auf eingehende Verbindungen.
+Der Server startet ohne Spieler und wartet auf eingehende Verbindungen. Dieses Modell des \emph{Authoritative Server} ist ein fundamentaler Ansatz, um Inkonsistenzen und Betrugsversuche (\emph{Cheating}) in Mehrspieler-Spielen zu verhindern~\cite{gambetta2014client_server}.
 
 Der \textbf{Client} ist für die Interaktion mit dem Spieler zuständig.
 Beim Start generiert der Client zunächst eine eigene, lokale Spielinstanz, um dem Spieler eine sofortige Interaktion zu ermöglichen.
@@ -31,14 +27,15 @@ Parallel versucht er für einige Sekunden, eine Verbindung zum Server aufzubauen
 Scheitert dieser Versuch, verbleibt der Client im lokalen Modus.
 Bei erfolgreicher Verbindung verwirft der Client seinen lokalen Zustand und übernimmt den autoritativen \emph{Game State} (insbesondere die Map und die Liste der Spieler), den er vom Server empfängt.
 Der Spieler wird so nahtlos in eine bereits laufende Runde integriert.
-
 Der kontinuierliche Spielablauf (\emph{Game Loop}) unterscheidet sich in seinen Aufgaben:
 \begin{itemize}
-    \item \textbf{Client-Loop:} Der Client erfasst kontinuierlich die Benutzereingaben (Tastatur und Maus), sendet diese an den Server und empfängt die aktualisierten Spielzustände. Parallel dazu rendert er den Spielzustand lokal, um eine flüssige Darstellung zu gewährleisten.
-    \item \textbf{Server-Loop:} Der Server empfängt die Input-Pakete aller verbundenen Clients. Er verarbeitet diese Eingaben, aktualisiert die Positionen der Spieler, simuliert die Bewegung der Projektile und prüft auf Kollisionen. Nach jedem Simulationsschritt (\texttt{tick}) sendet er den neuen, vollständigen \emph{Game State} an alle Clients (\emph{Broadcast}).
+    \item \textbf{Client-Loop:} Der Client erfasst kontinuierlich die Benutzereingaben (Tastatur und Maus), sendet diese an den Server und empfängt die aktualisierten Spielzustände.
+Parallel dazu rendert er den Spielzustand lokal, um eine flüssige Darstellung zu gewährleisten.
+\item \textbf{Server-Loop:} Der Server empfängt die Input-Pakete aller verbundenen Clients.
+Er verarbeitet diese Eingaben, aktualisiert die Positionen der Spieler, simuliert die Bewegung der Projektile und prüft auf Kollisionen.
+Nach jedem Simulationsschritt (\texttt{tick}) sendet er den neuen, vollständigen \emph{Game State} an alle Clients (\emph{Broadcast}).
 \end{itemize}
 Sowohl Server als auch Client arbeiten zu Beginn jedes Schleifendurchlaufs ihre jeweilige Nachrichten-Warteschlange ab, bevor die eigentliche Spiellogik ausgeführt und der Zustand neu gezeichnet wird.
-
 \end{subsection}
 
 \begin{subsection}{Kommunikationsprotokoll und Paket-Serialisierung}
@@ -46,12 +43,11 @@ Für eine effiziente Kommunikation über das Netzwerk wurde ein minimalistisches
 Um die verschiedenen Arten von Nachrichten schnell und eindeutig zu identifizieren, wurde ein \texttt{enum} für Nachrichtentypen definiert.
 Jedes Paket wird mit einem Byte eingeleitet, das den Typ der Nachricht festlegt (z.B. \texttt{Connect}, \texttt{PlayerInput} oder \texttt{GameStateUpdate}).
 Dies ermöglicht es dem Empfänger, den restlichen Inhalt des Pakets korrekt zu deserialisieren und zu verarbeiten.
-
 Ein zentrales Ziel war die Minimierung der Paketgröße, um die Netzwerklast gering zu halten und die Verarbeitungszeit auf dem Server zu reduzieren.
 Datenstrukturen wurden daher nicht mit Standard-Bibliotheken, sondern manuell serialisiert, um eine maximale Kompaktheit zu erreichen.
 Ein anschauliches Beispiel ist die Übertragung der Spielereingaben:
 Statt für jede Bewegungsrichtung (hoch, runter, links, rechts) und die Schussaktion separate Booleans zu senden, werden diese fünf Zustände in einem einzigen Byte zusammengefasst.
-Jeder Zustand korrespondiert mit einem bestimmten Bit, das mittels bitweiser ODER-Verknüpfung gesetzt wird.
+Jeder Zustand korrespondiert mit einem bestimmten Bit, das mittels bitweiser ODER-Verknüpfung gesetzt wird. Diese Technik, bekannt als \emph{Bit Packing}, ist eine fundamentale Methode zur Datenkompression in ressourcenbeschränkten Systemen und im Netzwerk-Gaming~\cite{kinematicsoup2016bitpacking}.
 \begin{verbatim}
 // Pseudocode zur Kompaktierung der Eingaben
 let mut input_flags = 0u8;
@@ -62,23 +58,22 @@ if self.left     : input_flags |= 0b01000;
 if self.shooting : input_flags |= 0b10000;
 \end{verbatim}
 Dieses Vorgehen reduziert den Datenaufwand für die Zustandsübertragung erheblich und entlastet den Server, der diese Informationen von allen Clients gleichzeitig verarbeiten muss.
-
 \end{subsection}
 
 \begin{subsection}{Clientseitige Berechnung zur Reduzierung der Datenmenge}
 Um die vom Server zu übertragende Datenmenge weiter zu reduzieren, wurde ein Teil der Berechnungen auf die Clients ausgelagert.
-Das prominenteste Beispiel hierfür ist die Simulation der Projektilflugbahnen.
+Ein Beispiel hierfür ist die Simulation der Projektilflugbahnen.
 Wie zuvor beschrieben, wird der vollständige Pfad eines Projektils, inklusive aller Abprallpunkte an Wänden, bereits bei dessen Erstellung berechnet und in einer Warteschlange gespeichert.
-
 Anstatt diese komplette Liste von Kollisionspunkten – die über 100 Bytes pro Projektil umfassen kann – über das Netzwerk zu senden, übermittelt der Server lediglich die initialen Parameter: die Startposition, die Richtung (definiert durch die Mausposition zum Zeitpunkt des Schusses) und eine ID des Schützen.
 Der Client, der über eine identische Kopie der Map verfügt, nutzt diese wenigen Daten (insgesamt nur 24 Bytes), um die exakt gleiche Flugbahn lokal und selbstständig zu berechnen.
-
-Diese Methode der clientseitigen Berechnung (\emph{Client-Side Prediction}) hat zwei entscheidende Vorteile:
+Diese Methode der clientseitigen Berechnung (\emph{Client-Side Prediction}) hat zwei entscheidende Vorteile~\cite{valve_prediction}:
 \begin{enumerate}
-    \item \textbf{Reduzierte Paketgröße:} Die für ein Projektil benötigte Datenmenge wird drastisch verringert, was den Server entlastet und die Bandbreitennutzung optimiert. Bei mehreren Spielern, die gleichzeitig schießen, ist diese Einsparung signifikant.
-    \item \textbf{Verbesserte Latenz-Toleranz:} Da der Client die Flugbahn selbst berechnet, kann er die Projektile flüssig und ohne Verzögerung darstellen, auch wenn es zu kleineren Netzwerklatenzen oder Paketverlusten bei den \emph{GameStateUpdate}-Nachrichten kommt. Die visuelle Darstellung auf dem Client bleibt dadurch konsistent und reaktionsschnell.
+    \item \textbf{Reduzierte Paketgröße:} Die für ein Projektil benötigte Datenmenge wird drastisch verringert, was den Server entlastet und die Bandbreitennutzung optimiert.
+Bei mehreren Spielern, die gleichzeitig schießen, ist diese Einsparung signifikant.
+\item \textbf{Verbesserte Latenz-Toleranz:} Da der Client die Flugbahn selbst berechnet, kann er die Projektile flüssig und ohne Verzögerung darstellen, auch wenn es zu kleineren Netzwerklatenzen oder Paketverlusten bei den \emph{GameStateUpdate}-Nachrichten kommt.
+Die visuelle Darstellung auf dem Client bleibt dadurch konsistent und reaktionsschnell.
 \end{enumerate}
-
+Diese Technik ist eine der wichtigsten Strategien, um die wahrgenommene Latenz in schnellen Mehrspieler-Spielen zu verbergen und ein reaktionsfähiges Spielgefühl zu erzeugen~\cite{gambetta2014prediction}.
 \end{subsection}
 
 \end{section}

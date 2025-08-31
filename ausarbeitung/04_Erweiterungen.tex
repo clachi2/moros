@@ -1,23 +1,28 @@
 \begin{section}{Erweiterungen für MOROS}
 
-Damit MOROS die Grundlage für ein interaktives und verteiltes Spiel werden konnte, mussten mehrere Komponenten ergänzt oder erweitert werden.
+So nützlich MOROS als Minimalplattform ist, so eingeschränkt sind seine Möglichkeiten in der Standardkonfiguration.
 Im Ausgangszustand bietet MOROS lediglich eine Shell, ein Dateisystem und rudimentäre Netzwerkunterstützung.
-Folgende Erweiterungen waren notwendig, um die Spielmechanik und die Netzwerkkommunikation umzusetzen:
-
+Insbesondere fehlen elementare Schnittstellen, die für interaktive oder grafische Anwendungen erforderlich sind.
+Ein Beispiel ist die Unterstützung für Zeigegeräte wie die Maus, die in MOROS nicht implementiert war.
+Auch für die Ausgabe über den Bildschirm standen lediglich sehr einfache Textoperationen zur Verfügung.
+Um ein interaktives Spiel zu realisieren, mussten daher mehrere neue Komponenten entwickelt werden:
 \begin{itemize}
-    \item \textbf{Framebuffer:} für die grafische Darstellung von Spielfeld, Spielern und Objekten.
-    \item \textbf{PS/2-Maus:} um eine zweite Eingabequelle neben der Tastatur zu haben und Zielen/Schießen zu ermöglichen.
-    \item \textbf{UDP-Erweiterungen:} um Kommunikation zwischen Server und Clients über das Netzwerk zu ermöglichen.
-    \item \textbf{Debugging-Ausgaben:} zur Fehleranalyse und Entwicklung.
+    \item Einführung eines Framebuffers, um primitive grafische Operationen wie das Zeichnen von Linien, Rechtecken oder Text in Farben zu ermöglichen.
+    \item Implementierung einer vollständigen PS/2-Maus-Schnittstelle über Interrupts.
+    \item Erweiterung und Fehlerbehebung im Netzwerkstack, um stabile UDP-Kommunikation zu gewährleisten.
+    \item Zusätzliche Debugging-Funktionalitäten, um Entwicklungs- und Fehlersuche im Kernel zu erleichtern.
 \end{itemize}
 
 Alle diese Komponenten sind eng in den Betriebssystemkern eingebunden und wurden gezielt für die Spielentwicklung ergänzt.
+Diese Erweiterungen bilden die Grundlage für die spätere Spieleentwicklung.
+Damit zeigt MOROS nicht nur seine Eignung als Lehrplattform, sondern auch, wie selbst auf einer stark reduzierten Systembasis
+komplexe und interaktive Anwendungen möglich werden.
 Im Folgenden werden die Erweiterungen im Detail beschrieben.
 
 \begin{subsection}{Framebuffer}
 Ein \textbf{Framebuffer} ist ein Bereich im Speicher, der direkt die Bildschirmausgabe repräsentiert.
 Jedes Byte (bzw. jedes Pixel) im Framebuffer entspricht einem Bildpunkt auf dem Monitor.
-Das System zeichnet, indem es Werte in diesen Speicher schreibt \cite{foley1995computer, osdev_framebuffer}.
+Das System zeichnet, indem es Werte in diesen Speicher schreibt~\cite{osdev_framebuffer}.
 
 In MOROS wird der Pointer auf den Videospeicher bereits bereitgestellt.
 Unser Framebuffer-Modul kapselt diesen Speicher jedoch in einer \texttt{struct}, die folgende Daten speichert:
@@ -29,11 +34,11 @@ Unser Framebuffer-Modul kapselt diesen Speicher jedoch in einer \texttt{struct},
 \end{itemize}
 
 Der Puffer wird über \texttt{flush()} atomar in den tatsächlichen Framebuffer von MOROS kopiert.
-So wird immer ein vollständiges Bild ausgegeben, ohne dass während der Berechnung Artefakte entstehen. Dieses Vorgehen ist als Double Buffering bekannt und eine Standardtechnik zur Vermeidung von Flimmern (Flickering) in der Computergrafik \cite{nystrom2014game, osdev_double_buffering}.
+So wird immer ein vollständiges Bild ausgegeben, ohne dass während der Berechnung Artefakte entstehen. Dieses Vorgehen ist als Double Buffering bekannt und eine Standardtechnik zur Vermeidung von Flimmern (Flickering) in der Computergrafik~\cite{osdev_double_buffering}.
 Der Framebuffer unterstützt verschiedene Funktionen:
 \begin{itemize}
     \item \textbf{Pixel setzen:} direktes Setzen einer Farbe an einer Position.
-    \item \textbf{Linien zeichnen:} implementiert mit dem Bresenham-Algorithmus \cite{bresenham1965algorithm}.
+    \item \textbf{Linien zeichnen:} implementiert mit dem Bresenham-Algorithmus~\cite{bresenham1965algorithm}.
     \item \textbf{Rechtecke zeichnen:} sowohl Umrandung als auch Füllung möglich.
     \item \textbf{Kreise zeichnen:} mit oder ohne Füllung.
     \item \textbf{Textausgabe:} mit einem Bitmap-Font, inklusive Skalierung.
@@ -48,7 +53,7 @@ Für das Zielen und Schießen im Spiel war eine zweite Eingabemöglichkeit notwe
 Dazu wurde eine vollständige PS/2-Maus-Unterstützung in MOROS ergänzt.
 \paragraph{Initialisierung.}
 MOROS bietet eine Schnittstelle, um Interrupt-Handler zu registrieren.
-Für die Maus wird der IRQ12 (PS/2-Port) über folgende Schritte initialisiert \cite{osdev_ps2_mouse, intel8259a_pic}:
+Für die Maus wird der IRQ12 (PS/2-Port) über folgende Schritte initialisiert~\cite{osdev_ps2_mouse, intel8259a_pic}:
 \begin{itemize}
     \item Aktivieren des zweiten PS/2-Ports mit Befehl \texttt{0xA8}.
     \item Konfiguration des Controllers und Aktivieren von IRQ12.
@@ -62,12 +67,12 @@ Die Daten werden in ein \texttt{MouseEvent} umgewandelt, das die Buttons und Bew
 \paragraph{Ereignis-Queue.}
 Da Mausbewegungen asynchron eintreffen, speichern wir sie in einer lockfreien Queue (MPMC).
 Der Spiel-Loop kann so jederzeit das letzte Event abfragen oder blockierend auf ein neues Event warten.
-Dies entkoppelt die schnelle IRQ-Verarbeitung von der Spiel-Logik. Die Verwendung einer lockfreien Multiple-Producer-Multiple-Consumer-Warteschlange ist eine moderne Technik zur effizienten Synchronisation in nebenläufigen Systemen \cite{nikolaev2019scalable}.
+Dies entkoppelt die schnelle IRQ-Verarbeitung von der Spiel-Logik. Die Verwendung einer lockfreien Multiple-Producer-Multiple-Consumer-Warteschlange ist eine moderne Technik zur effizienten Synchronisation in nebenläufigen Systemen~\cite{nikolaev2019scalable}.
 
 \end{subsection}
 
 \begin{subsection}{UDP-Erweiterungen}
-Für die Netzwerkverteilung des Spiels war UDP entscheidend, da es schnelle und kompakte Nachrichten erlaubt, wie im definierenden Standard beschrieben \cite{rfc768}.
+Für die Netzwerkverteilung des Spiels war UDP entscheidend, da es schnelle und kompakte Nachrichten erlaubt, wie im definierenden Standard beschrieben~\cite{rfc768}.
 MOROS brachte jedoch keine vollständige Implementierung mit.
 
 \paragraph{\texttt{listen}-Methode.}
@@ -84,7 +89,7 @@ Diese Änderungen machten eine stabile Echtzeitkommunikation im Spiel erst mögl
 
 \begin{subsection}{Debugging-Ausgaben}
 Während der Entwicklung waren Debugging-Funktionen unverzichtbar.
-Dafür wurde die Serial-Unterstützung aus \emph{hhuTOSr} übernommen und die Makros \texttt{kprint!} und \texttt{kprintln!} in MOROS integriert \cite{hhutosr_github}.
+Dafür wurde die Serial-Unterstützung aus \emph{hhuTOSr} übernommen und die Makros \texttt{kprint!} und \texttt{kprintln!} in MOROS integriert~\cite{hhutosr_github}.
 Damit lassen sich einfache Debug-Ausgaben direkt auf die Konsole schreiben, ähnlich wie \texttt{println!} in Rust.
 Diese Ausgaben halfen insbesondere bei:
 \begin{itemize}

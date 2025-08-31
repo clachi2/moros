@@ -2,7 +2,7 @@
 
 Nachdem im vorherigen Kapitel die notwendigen Erweiterungen für MOROS beschrieben wurden, widmet sich dieses Kapitel dem Aufbau des Spiels selbst.
 Die Implementierung wurde bewusst von den betriebssystemnahen Komponenten getrennt, um eine klare und modulare Architektur zu gewährleisten.
-Dieser Ansatz folgt dem Prinzip des Information Hiding, das eine Entkopplung von Systemkomponenten fordert, um die Wartbarkeit und Veränderbarkeit zu verbessern \cite{parnas1972criteria}.
+Dieser Ansatz folgt dem Prinzip des Information Hiding, das eine Entkopplung von Systemkomponenten fordert, um die Wartbarkeit und Veränderbarkeit zu verbessern.
 Das gesamte Spiel ist in einem eigenen \texttt{game}-Modul gekapselt, das eine klar definierte öffentliche Schnittstelle für die Ansteuerung von außen – sei es durch einen lokalen Spieler oder über das Netzwerk – bereitstellt.
 \begin{subsection}{Grundkomponenten}
 
@@ -31,7 +31,7 @@ Nach der Initialisierung einer \texttt{Game}-Instanz wird eine Dauerschleife dur
 Der Spielablauf wird durch eine klassische Game-Loop-Architektur -- \emph{Input, Tick, Draw} -- realisiert, die durch die \texttt{tick()}-Methode in \texttt{game.rs} gesteuert wird.
 Ein zentrales Konzept dabei ist die Zeitabhängigkeit der Spiellogik.
 Um eine konsistente Spielgeschwindigkeit unabhängig von der Leistung der ausführenden Hardware zu gewährleisten, wird vor jeder Aktualisierung die seit dem letzten Tick vergangene Zeit (\texttt{tick\_delta}) gemessen.
-Alle Bewegungen und zeitbasierten Aktionen werden mit diesem Delta-Wert skaliert. Dies ist ein etabliertes Muster, um die Physiksimulation von der Rendering-Framerate zu entkoppeln \cite{nystrom2014game, fiedler2004fix}.
+Alle Bewegungen und zeitbasierten Aktionen werden mit diesem Delta-Wert skaliert. Dies ist ein etabliertes Muster, um die Physiksimulation von der Rendering-Framerate zu entkoppeln~\cite{fiedler2004fix}.
 Innerhalb eines Ticks werden die folgenden Aktionen in einer festen Reihenfolge ausgeführt:
 \begin{enumerate}
     \item \textbf{Spielerbewegung aktualisieren:} Für jeden lebenden Spieler wird die Position basierend auf den aktuellen Eingaben und dem \texttt{tick\_delta} neu berechnet.
@@ -40,10 +40,10 @@ Eine integrierte Kollisionsprüfung verhindert, dass Spieler durch Wände gehen 
 Ist dies der Fall, wird eine neue \texttt{Bullet}-Instanz erzeugt, deren kompletter Flugpfad sofort berechnet wird.
     \item \textbf{Geschosspositionen aktualisieren:} Alle aktiven Geschosse werden entlang ihres vorausberechneten Pfades weiterbewegt.
 Geschosse, die das Ende ihres Pfades erreicht haben, werden aus dem Spiel entfernt.
-    \item \textbf{Kollisionen prüfen:} Es wird überprüft, ob ein Geschoss die Hitbox \cite{infil_glossary_hitbox} eines Spielers schneidet.
+    \item \textbf{Kollisionen prüfen:} Es wird überprüft, ob ein Geschoss die Hitbox~\cite{infil_glossary_hitbox} eines Spielers schneidet.
 Bei einer Kollision wird der betroffene Spieler als getötet markiert, der Schütze erhält einen Punkt, und das Geschoss wird entfernt.
 Ein Spieler kann sich nicht selbst treffen.
-    \item \textbf{Respawn verwalten:} Für alle als getötet markierten Spieler wird geprüft, ob die festgelegte Respawn-Zeit \cite{larksuite_glossary_respawn} abgelaufen ist.
+    \item \textbf{Respawn verwalten:} Für alle als getötet markierten Spieler wird geprüft, ob die festgelegte Respawn-Zeit~\cite{larksuite_glossary_respawn} abgelaufen ist.
 Wenn ja, wird der Spieler an einer zufälligen Position auf der Karte wiederbelebt und sein Zustand zurückgesetzt.
 \end{enumerate}
 Dieser deterministische Ablauf stellt sicher, dass der Spielzustand bei gleichen Eingaben immer auf dieselbe Weise fortschreitet, was insbesondere für die Netzwerk-Synchronisation von entscheidender Bedeutung ist.
@@ -72,7 +72,7 @@ Die Verwendung dieses Double-Buffering-Verfahrens verhindert visuelle Artefakte 
 \begin{subsection}{Map- und Map-Generierung}
 
 Das Spielfeld bildet die Grundlage für alle Interaktionen und muss sowohl abwechslungsreich als auch fair gestaltet sein.
-Anstatt feste Koordinaten für Wände zu speichern, basiert die Kartenimplementierung auf einem Kachel-basierten System (\textit{tile-based system}) \cite{mdn_tilemaps}.
+Anstatt feste Koordinaten für Wände zu speichern, basiert die Kartenimplementierung auf einem Kachel-basierten System (\textit{tile-based system})~\cite{mdn_tilemaps}.
 Die Karte ist in ein Gitter aus Kacheln unterteilt, wobei jede Kachel über vier boolesche Attribute verfügt, die das Vorhandensein einer Wand in den Himmelsrichtungen \texttt{up}, \texttt{down}, \texttt{left} und \texttt{right} definieren.
 Dieser Ansatz ist speichereffizient und vereinfacht die Kollisionsabfrage.
 
@@ -106,7 +106,7 @@ Findet der Algorithmus eine benachbarte Kachel, die nicht Teil des aktuellen Ber
 Unmittelbar nach der Entfernung einer Wand wird die innere Schleife für diesen Bereich abgebrochen (\texttt{break}).
 Dies stellt sicher, dass pro Iteration und pro Bereich nur eine einzige Verbindung geschaffen wird, was zu einem labyrinthartigen Charakter führt.
 Nach diesem Schritt wird die Bereichsanalyse mit \texttt{find\_distinct\_areas()} erneut ausgeführt, um die neu verbundenen Areale zu konsolidieren.
-Der Prozess konvergiert, bis nur noch ein einziger, vollständig zusammenhängender Bereich existiert und somit jede Kachel von jeder anderen aus erreichbar ist. Dieser Algorithmus ist eine Variante des Algorithmus von Kruskal zur Erzeugung eines minimalen Spannbaums, bei dem die Kacheln die Knoten und die entfernten Wände die Kanten des Graphen darstellen \cite{kruskal1956shortest}.
+Der Prozess konvergiert, bis nur noch ein einziger, vollständig zusammenhängender Bereich existiert und somit jede Kachel von jeder anderen aus erreichbar ist. Dieser Algorithmus ist eine Variante des Algorithmus von Kruskal zur Erzeugung eines minimalen Spannbaums, bei dem die Kacheln die Knoten und die entfernten Wände die Kanten des Graphen darstellen~\cite{kruskal1956shortest}.
 \end{subsection}
 
 \begin{subsection}{Spielerbewegung}
@@ -125,7 +125,7 @@ Die Kollisionserkennung selbst, implementiert in \texttt{is\_pos\_colliding()}, 
 Anstatt nur eine einzelne Kachel zu prüfen, wird ein 3x3-Gitter von Kacheln um die aktuelle Spielerposition herum analysiert.
 Aus diesem Gitter werden die exakten Liniensegmente aller vorhandenen Wände extrahiert.
 Schließlich wird für jede der vier Kanten der Bounding-Box des Spielers geprüft, ob sie eines dieser Wandsegmente schneidet.
-Diese Technik ist eine Form der Axis-Aligned Bounding Box (AABB) Kollisionserkennung \cite{mdn_aabb_collision}.
+Diese Technik ist eine Form der Axis-Aligned Bounding Box (AABB) Kollisionserkennung~\cite{mdn_aabb_collision}.
 Bereits eine einzige detektierte Überschneidung genügt, um die geplante Bewegung als ungültig zu werten und zu blockieren.
 \end{subsection}
 
@@ -141,7 +141,7 @@ Der Kern der Pfadberechnung ist die Methode \texttt{find\_next\_collision()}.
 Ein Test gegen jede Wand der Karte wäre ineffizient.
 Stattdessen wird der Suchraum intelligent eingeschränkt:
 \begin{enumerate}
-    \item \textbf{Tile-Traversal via DDA:} Mit der Methode \texttt{get\_tiles\_on\_ray()} wird ein Digital Differential Analyzer (DDA) Algorithmus angewendet. Dieser ermittelt, ähnlich dem Bresenham-Algorithmus, eine exakte Liste aller Kacheln, die vom Strahl des Geschosses auf seinem aktuellen Kurs durchquert werden. Diese Technik ist in der Computergrafik als Voxel-Traversal bekannt \cite{amanatides1987fast}.
+    \item \textbf{Tile-Traversal via DDA:} Mit der Methode \texttt{get\_tiles\_on\_ray()} wird ein Digital Differential Analyzer (DDA) Algorithmus angewendet. Dieser ermittelt, ähnlich dem Bresenham-Algorithmus, eine exakte Liste aller Kacheln, die vom Strahl des Geschosses auf seinem aktuellen Kurs durchquert werden. Diese Technik ist in der Computergrafik als Voxel-Traversal bekannt~\cite{amanatides1987fast}.
     \item \textbf{Selektive Kollisionsprüfung:} Anstatt alle Wände der Karte zu prüfen, werden nur die Wände der Kacheln aus der zuvor erstellten Liste auf eine mögliche Kollision getestet.
     Hierzu wird eine Funktion für die Schnittpunktberechnung zwischen einem Strahl und einem Liniensegment (\texttt{ray\_line\_intersection}) verwendet.
     \item \textbf{Ermittlung des nächsten Treffers:} Der Algorithmus speichert alle gefundenen Kollisionspunkte und wählt denjenigen mit der geringsten Distanz zum Startpunkt des aktuellen Pfadsegments aus.
