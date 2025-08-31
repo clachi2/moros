@@ -1,17 +1,15 @@
 \begin{section}{Hintergrund: MOROS}
 
-MOROS (Minimal Obscure Rust Operating System) ist ein in der Programmiersprache \texttt{Rust} entwickeltes Betriebssystem, das bewusst minimalistisch gehalten ist.
+MOROS (Minimal Obscure Rust Operating System) ist ein in der Programmiersprache \texttt{Rust} entwickeltes Betriebssystem, das bewusst minimalistisch gehalten ist \cite{moros_github}.
 Es dient als Lehr- und Experimentierplattform, um grundlegende Betriebssystemkonzepte auf einer einfachen, gut überschaubaren Basis zu erproben.
 Der Name deutet bereits darauf hin: \emph{obscure}, da das System weder im Mainstream verbreitet noch für den produktiven Einsatz gedacht ist,
 sondern vor allem für Forschung, Lehre und persönliche Projekte genutzt wird.
-Seine Entwicklung in \texttt{Rust} bringt den Vorteil mit sich, dass Speicher- und Typsicherheit von Beginn an fest im System verankert sind.
-
+Seine Entwicklung in \texttt{Rust} bringt den Vorteil mit sich, dass Speicher- und Typsicherheit von Beginn an fest im System verankert sind \cite{klabnik2025rust}.
 \begin{subsection}{Eigenschaften von MOROS}
 MOROS ist vollständig textbasiert.
 Es gibt keine grafische Oberfläche, keine Fenstersysteme und keine modernen Multimedia-Schnittstellen.
 Die Benutzerinteraktion erfolgt über eine Shell, die grundlegende Kommandos unterstützt.
 Das Design erinnert damit an klassische Betriebssysteme aus den 1980er- und frühen 1990er-Jahren, die auf Minimalität und Funktionalität setzten.
-
 Trotz seines geringen Umfangs bietet MOROS bereits einige essentielle Komponenten:
 \begin{itemize}
     \item \textbf{Shell:} Kommandozeile für Benutzereingaben und Steuerung des Systems.
@@ -19,6 +17,7 @@ Trotz seines geringen Umfangs bietet MOROS bereits einige essentielle Komponente
     \item \textbf{Netzwerkstack:} Unterstützung grundlegender Netzwerkkommunikation, u.a. via UDP.
     \item \textbf{Speicherverwaltung:} Einfache Mechanismen zur Verwaltung von Haupt- und virtuellen Speicher.
 \end{itemize}
+Diese Komponenten stellen die Grundpfeiler eines jeden modernen Betriebssystems dar, wie sie in der Standardliteratur beschrieben werden \cite{tanenbaum2015modern}.
 \end{subsection}
 
 \begin{subsection}{Besonderheiten}
@@ -27,9 +26,8 @@ Rust vereint Systemsprache mit modernen Sicherheitskonzepten.
 Dadurch lassen sich typische Fehlerquellen wie Speicherzugriffsfehler oder
 Race-Conditions in vielen Fällen bereits zur Kompilierzeit verhindern.
 Diese Eigenschaft macht MOROS besonders geeignet für Experimente in sicherheitskritischen Bereichen.
-
 Darüber hinaus folgt MOROS einem modularen Ansatz: Statt eine große monolithische Struktur aufzubauen, werden Kernkomponenten schrittweise erweitert.
-Dies erleichtert das Verständnis und ermöglicht es, einzelne Bausteine gezielt zu verändern oder auszutauschen.
+Dies erleichtert das Verständnis und ermöglicht es, einzelne Bausteine gezielt zu verändern oder auszutauschen. Obwohl die Komponenten im selben Adressraum des Kernels laufen und MOROS somit eine monolithische Architektur darstellt, erinnert der Fokus auf klar getrennte Bausteine an die Designziele, die ursprünglich die Entwicklung von Microkerneln motivierten \cite{tanenbaum1992linux}.
 \end{subsection}
 
 \begin{subsection}{Motivation für Erweiterungen}
@@ -37,7 +35,6 @@ So nützlich MOROS als Minimalplattform ist, so eingeschränkt sind seine Mögli
 Insbesondere fehlen elementare Schnittstellen, die für interaktive oder grafische Anwendungen erforderlich sind.
 Ein Beispiel ist die Unterstützung für Zeigegeräte wie die Maus, die in MOROS nicht implementiert war.
 Auch für die Ausgabe über den Bildschirm standen lediglich sehr einfache Textoperationen zur Verfügung.
-
 Um ein interaktives Spiel zu realisieren, mussten daher mehrere neue Komponenten entwickelt werden:
 \begin{itemize}
     \item Implementierung einer vollständigen PS/2-Maus-Schnittstelle über Interrupts.

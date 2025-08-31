@@ -2,8 +2,8 @@
 
 Nachdem im vorherigen Kapitel die notwendigen Erweiterungen für MOROS beschrieben wurden, widmet sich dieses Kapitel dem Aufbau des Spiels selbst.
 Die Implementierung wurde bewusst von den betriebssystemnahen Komponenten getrennt, um eine klare und modulare Architektur zu gewährleisten.
+Dieser Ansatz folgt dem Prinzip des Information Hiding, das eine Entkopplung von Systemkomponenten fordert, um die Wartbarkeit und Veränderbarkeit zu verbessern \cite{parnas1972criteria}.
 Das gesamte Spiel ist in einem eigenen \texttt{game}-Modul gekapselt, das eine klar definierte öffentliche Schnittstelle für die Ansteuerung von außen – sei es durch einen lokalen Spieler oder über das Netzwerk – bereitstellt.
-
 \begin{subsection}{Grundkomponenten}
 
 Die Architektur des Spiels ist in mehrere spezialisierte Komponenten unterteilt, die jeweils eine spezifische Aufgabe erfüllen.
@@ -11,7 +11,7 @@ Diese Modularität spiegelt sich auch in der Dateistruktur wider, die sich inner
 
 \begin{itemize}
     \item \texttt{game.rs:} Dient als zentrale Koordinationsinstanz und bildet die einzige öffentliche Schnittstelle des Spielmoduls.
-    Es initialisiert und verwaltet den Spielzustand sowie den Renderer.
+Es initialisiert und verwaltet den Spielzustand sowie den Renderer.
     \item \texttt{state.rs:} Definiert die \texttt{GameState}-Struktur, welche alle dynamischen Daten des Spiels wie die Karte, eine Liste aller Spieler und aller aktiven Geschosse enthält.
     \item \texttt{map.rs:} Implementiert die Spiellogik für die Karte, einschließlich ihrer Kachel-basierten Struktur, der Wandinformationen und der prozeduralen Generierung des Labyrinths.
     \item \texttt{player.rs:} Definiert die \texttt{Player}-Struktur, die alle zustandsbehafteten Informationen eines Spielers kapselt, wie Position, Lebensstatus (\texttt{alive}), Punkte, Munition und die verarbeiteten Benutzereingaben.
@@ -24,7 +24,6 @@ Diese Modularität spiegelt sich auch in der Dateistruktur wider, die sich inner
 
 Die Nutzung des Spiels von außen, beispielsweise aus der \texttt{main.rs}, folgt einem einfachen Muster.
 Nach der Initialisierung einer \texttt{Game}-Instanz wird eine Dauerschleife durchlaufen, in der zyklisch die Eingaben der Spieler aktualisiert, der Spielzustand über die \texttt{tick()}-Methode weiterberechnet und das Ergebnis anschließend mit der \texttt{draw()}-Methode gerendert wird.
-
 \end{subsection}
 
 \begin{subsection}{Spielablauf (Game-Loop)}
@@ -32,24 +31,22 @@ Nach der Initialisierung einer \texttt{Game}-Instanz wird eine Dauerschleife dur
 Der Spielablauf wird durch eine klassische Game-Loop-Architektur -- \emph{Input, Tick, Draw} -- realisiert, die durch die \texttt{tick()}-Methode in \texttt{game.rs} gesteuert wird.
 Ein zentrales Konzept dabei ist die Zeitabhängigkeit der Spiellogik.
 Um eine konsistente Spielgeschwindigkeit unabhängig von der Leistung der ausführenden Hardware zu gewährleisten, wird vor jeder Aktualisierung die seit dem letzten Tick vergangene Zeit (\texttt{tick\_delta}) gemessen.
-Alle Bewegungen und zeitbasierten Aktionen werden mit diesem Delta-Wert skaliert.
-
+Alle Bewegungen und zeitbasierten Aktionen werden mit diesem Delta-Wert skaliert. Dies ist ein etabliertes Muster, um die Physiksimulation von der Rendering-Framerate zu entkoppeln \cite{nystrom2014game, fiedler2004fix}.
 Innerhalb eines Ticks werden die folgenden Aktionen in einer festen Reihenfolge ausgeführt:
 \begin{enumerate}
     \item \textbf{Spielerbewegung aktualisieren:} Für jeden lebenden Spieler wird die Position basierend auf den aktuellen Eingaben und dem \texttt{tick\_delta} neu berechnet.
-    Eine integrierte Kollisionsprüfung verhindert, dass Spieler durch Wände gehen können.
+Eine integrierte Kollisionsprüfung verhindert, dass Spieler durch Wände gehen können.
     \item \textbf{Schussaktionen verarbeiten:} Wenn ein Spieler eine Schussaktion auslöst, wird geprüft, ob die Feuerrate und der Munitionsvorrat dies zulassen.
-    Ist dies der Fall, wird eine neue \texttt{Bullet}-Instanz erzeugt, deren kompletter Flugpfad sofort berechnet wird.
+Ist dies der Fall, wird eine neue \texttt{Bullet}-Instanz erzeugt, deren kompletter Flugpfad sofort berechnet wird.
     \item \textbf{Geschosspositionen aktualisieren:} Alle aktiven Geschosse werden entlang ihres vorausberechneten Pfades weiterbewegt.
-    Geschosse, die das Ende ihres Pfades erreicht haben, werden aus dem Spiel entfernt.
-    \item \textbf{Kollisionen prüfen:} Es wird überprüft, ob ein Geschoss die Hitbox eines Spielers schneidet.
-    Bei einer Kollision wird der betroffene Spieler als getötet markiert, der Schütze erhält einen Punkt, und das Geschoss wird entfernt.
-    Ein Spieler kann sich nicht selbst treffen.
-    \item \textbf{Respawn verwalten:} Für alle als getötet markierten Spieler wird geprüft, ob die festgelegte Respawn-Zeit abgelaufen ist.
-    Wenn ja, wird der Spieler an einer zufälligen Position auf der Karte wiederbelebt und sein Zustand zurückgesetzt.
+Geschosse, die das Ende ihres Pfades erreicht haben, werden aus dem Spiel entfernt.
+    \item \textbf{Kollisionen prüfen:} Es wird überprüft, ob ein Geschoss die Hitbox \cite{infil_glossary_hitbox} eines Spielers schneidet.
+Bei einer Kollision wird der betroffene Spieler als getötet markiert, der Schütze erhält einen Punkt, und das Geschoss wird entfernt.
+Ein Spieler kann sich nicht selbst treffen.
+    \item \textbf{Respawn verwalten:} Für alle als getötet markierten Spieler wird geprüft, ob die festgelegte Respawn-Zeit \cite{larksuite_glossary_respawn} abgelaufen ist.
+Wenn ja, wird der Spieler an einer zufälligen Position auf der Karte wiederbelebt und sein Zustand zurückgesetzt.
 \end{enumerate}
 Dieser deterministische Ablauf stellt sicher, dass der Spielzustand bei gleichen Eingaben immer auf dieselbe Weise fortschreitet, was insbesondere für die Netzwerk-Synchronisation von entscheidender Bedeutung ist.
-
 \end{subsection}
 
 \begin{subsection}{Rendering}
@@ -57,28 +54,26 @@ Dieser deterministische Ablauf stellt sicher, dass der Spielzustand bei gleichen
 Die visuelle Darstellung des Spiels wird vollständig von der \texttt{Renderer}-Komponente übernommen.
 Diese greift auf die zuvor implementierte Framebuffer-Schnittstelle zu, um grafische Primitiven wie Linien, gefüllte Rechtecke und Text zu zeichnen.
 Der Rendering-Prozess, der in der \texttt{draw()}-Methode aufgerufen wird, ist klar strukturiert, um eine flimmerfreie und performante Ausgabe zu gewährleisten.
-
 Der Ablauf pro Frame ist wie folgt:
 \begin{enumerate}
     \item \textbf{Framebuffer leeren:} Zunächst wird der gesamte Bildschirm mit der Hintergrundfarbe gefüllt.
     \item \textbf{Karte zeichnen:} Um die statische Karten-Geometrie nicht in jedem Frame neu berechnen zu müssen, wird diese einmalig auf einen internen Puffer (einen zweiten, nicht sichtbaren Framebuffer) gezeichnet.
-    In jedem Frame wird dann nur noch dieser Puffer auf den sichtbaren Framebuffer kopiert.
+In jedem Frame wird dann nur noch dieser Puffer auf den sichtbaren Framebuffer kopiert.
     \item \textbf{Spielelemente zeichnen:} Der Renderer iteriert durch die Listen der Spieler und Geschosse im \texttt{GameState} und zeichnet jedes Element an seiner aktuellen Position mit seiner zugeordneten Farbe.
     \item \textbf{GUI zeichnen:} Die Benutzeroberfläche, bestehend aus den Punkteständen und der Munitionsanzeige für jeden Spieler, wird an einer festen Position (dem linken Bildschirmrand) gezeichnet.
     \item \textbf{Mauszeiger zeichnen:} Für den lokalen Spieler wird ein Fadenkreuz an der aktuellen Mausposition gerendert.
     \item \textbf{Framebuffer anzeigen:} Abschließend wird die \texttt{flush()}-Methode des Framebuffers aufgerufen.
-    Diese kopiert den fertig gezeichneten, internen Puffer in den Videospeicher des Systems, wodurch das neue Bild auf dem Monitor sichtbar wird.
-    Die Verwendung dieses Double-Buffering-Verfahrens verhindert visuelle Artefakte wie Flimmern.
+Diese kopiert den fertig gezeichneten, internen Puffer in den Videospeicher des Systems, wodurch das neue Bild auf dem Monitor sichtbar wird.
+Die Verwendung dieses Double-Buffering-Verfahrens verhindert visuelle Artefakte wie Flimmern.
 \end{enumerate}
 
 \end{subsection}
 
-\end{section}
-
 \begin{subsection}{Map- und Map-Generierung}
 
 Das Spielfeld bildet die Grundlage für alle Interaktionen und muss sowohl abwechslungsreich als auch fair gestaltet sein.
-Anstatt feste Koordinaten für Wände zu speichern, basiert die Kartenimplementierung auf einem Kachel-basierten System (\textit{tile-based system}). Die Karte ist in ein Gitter aus Kacheln unterteilt, wobei jede Kachel über vier boolesche Attribute verfügt, die das Vorhandensein einer Wand in den Himmelsrichtungen \texttt{up}, \texttt{down}, \texttt{left} und \texttt{right} definieren.
+Anstatt feste Koordinaten für Wände zu speichern, basiert die Kartenimplementierung auf einem Kachel-basierten System (\textit{tile-based system}) \cite{mdn_tilemaps}.
+Die Karte ist in ein Gitter aus Kacheln unterteilt, wobei jede Kachel über vier boolesche Attribute verfügt, die das Vorhandensein einer Wand in den Himmelsrichtungen \texttt{up}, \texttt{down}, \texttt{left} und \texttt{right} definieren.
 Dieser Ansatz ist speichereffizient und vereinfacht die Kollisionsabfrage.
 
 Um für jede Spielrunde eine neue Herausforderung zu bieten, wird die Karte prozedural generiert.
@@ -90,7 +85,6 @@ Zunächst wird eine leere Karte ohne interne Wände erstellt.
 Anschließend werden basierend auf einem Dichteparameter (\texttt{WALL\_DENSITY}) zufällig Wände platziert.
 Um Redundanzen zu vermeiden, wird für jede Kachel nur entschieden, ob eine Wand nach oben oder nach links gesetzt wird.
 Abschließend werden die äußeren Ränder der Karte als unpassierbare Grenzen festgelegt.
-
 \paragraph{Identifikation von Bereichen}
 Das zufällige Setzen von Wänden führt zwangsläufig zur Bildung voneinander isolierter Bereiche.
 Um diese zu identifizieren, wird die Methode \texttt{find\_distinct\_areas()} ausgeführt.
@@ -103,39 +97,36 @@ Die startende Kachel wird als besucht markiert und der Liste des aktuellen Berei
 Danach ruft sich die Methode für alle benachbarten Kacheln rekursiv selbst auf, sofern keine Wand den Weg blockiert.
 Dieser Prozess setzt sich fort, bis alle erreichbaren Kacheln markiert und dem Bereich hinzugefügt wurden.
 Das Ergebnis ist eine Liste von disjunkten Kachelmengen, die die voneinander getrennten "Inseln" der Karte repräsentieren.
-
 \paragraph{Verbindung der Bereiche}
 Solange mehr als ein Bereich existiert, wird eine Schleife durchlaufen, die diese Bereiche schrittweise miteinander verbindet.
 In jeder Iteration wird die Methode \texttt{remove\_one\_wall\_per\_area()} aufgerufen.
 Diese durchläuft jeden identifizierten Bereich und innerhalb dessen jede Kachel.
 Für jede Kachel werden ihre Nachbarn überprüft.
 Findet der Algorithmus eine benachbarte Kachel, die nicht Teil des aktuellen Bereichs ist und durch eine Wand getrennt ist, wird exakt diese Wand entfernt.
-Unmittelbar nach der Entfernung einer Wand wird die innere Schleife für diesen Bereich abgebrochen (\texttt{break}). Dies stellt sicher, dass pro Iteration und pro Bereich nur eine einzige Verbindung geschaffen wird, was zu einem labyrinthartigen Charakter führt.
+Unmittelbar nach der Entfernung einer Wand wird die innere Schleife für diesen Bereich abgebrochen (\texttt{break}).
+Dies stellt sicher, dass pro Iteration und pro Bereich nur eine einzige Verbindung geschaffen wird, was zu einem labyrinthartigen Charakter führt.
 Nach diesem Schritt wird die Bereichsanalyse mit \texttt{find\_distinct\_areas()} erneut ausgeführt, um die neu verbundenen Areale zu konsolidieren.
-Der Prozess konvergiert, bis nur noch ein einziger, vollständig zusammenhängender Bereich existiert und somit jede Kachel von jeder anderen aus erreichbar ist.
-
+Der Prozess konvergiert, bis nur noch ein einziger, vollständig zusammenhängender Bereich existiert und somit jede Kachel von jeder anderen aus erreichbar ist. Dieser Algorithmus ist eine Variante des Algorithmus von Kruskal zur Erzeugung eines minimalen Spannbaums, bei dem die Kacheln die Knoten und die entfernten Wände die Kanten des Graphen darstellen \cite{kruskal1956shortest}.
 \end{subsection}
 
 \begin{subsection}{Spielerbewegung}
 
 Die Bewegung der Spieler wird durch Tastatureingaben gesteuert und muss zwei wesentliche Anforderungen erfüllen: Sie soll flüssig und reaktionsschnell sein, aber gleichzeitig eine präzise Kollisionserkennung mit den Wänden der Karte gewährleisten.
 Um eine hardwareunabhängige Bewegungsgeschwindigkeit zu sichern, wird die pro Tick zurückzulegende Distanz durch Multiplikation der Basisgeschwindigkeit \texttt{PLAYER\_SPEED} mit der Zeitdelta \texttt{tick\_delta} berechnet.
-
 Eine naive Implementierung, bei der die Spielerkoordinaten direkt auf die neue Zielposition gesetzt werden, birgt das Risiko des "Tunnelns", bei dem Spieler bei hoher Geschwindigkeit oder niedriger Tick-Rate durch dünne Wände hindurch gelangen könnten.
 Um dies zu verhindern, wird die Bewegung in der Methode \texttt{update\_position()} in \texttt{player.rs} inkrementell in kleinen Schritten vollzogen.
 Die zu bewegende Gesamtdistanz wird in Einzelschritte von einem Pixel Länge zerlegt.
 In einer Schleife wird für jeden Schritt die Kollision am potenziellen nächsten Punkt geprüft, bevor die Position des Spielers tatsächlich aktualisiert wird.
-
 Ein wesentliches Detail der Implementierung ist die getrennte Behandlung der Bewegungen auf der X- und Y-Achse.
 Vor jedem Bewegungsschritt wird separat geprüft, ob eine Bewegung in X-Richtung und eine in Y-Richtung kollisionsfrei möglich ist.
-Dies ermöglicht es Spielern, an Wänden entlang zu "gleiten" (\textit{wall sliding}). Versucht ein Spieler, sich diagonal in eine Ecke zu bewegen, die auf einer Seite blockiert ist, wird nur die Bewegung auf der blockierten Achse verhindert, während die Bewegung auf der freien Achse weiterhin ausgeführt wird.
-
+Dies ermöglicht es Spielern, an Wänden entlang zu "gleiten" (\textit{wall sliding}).
+Versucht ein Spieler, sich diagonal in eine Ecke zu bewegen, die auf einer Seite blockiert ist, wird nur die Bewegung auf der blockierten Achse verhindert, während die Bewegung auf der freien Achse weiterhin ausgeführt wird.
 Die Kollisionserkennung selbst, implementiert in \texttt{is\_pos\_colliding()}, muss die Größe der Spielfigur (\texttt{PLAYER\_SIZE}) berücksichtigen, die sich über Kachelgrenzen hinweg erstrecken kann.
 Anstatt nur eine einzelne Kachel zu prüfen, wird ein 3x3-Gitter von Kacheln um die aktuelle Spielerposition herum analysiert.
 Aus diesem Gitter werden die exakten Liniensegmente aller vorhandenen Wände extrahiert.
 Schließlich wird für jede der vier Kanten der Bounding-Box des Spielers geprüft, ob sie eines dieser Wandsegmente schneidet.
+Diese Technik ist eine Form der Axis-Aligned Bounding Box (AABB) Kollisionserkennung \cite{mdn_aabb_collision}.
 Bereits eine einzige detektierte Überschneidung genügt, um die geplante Bewegung als ungültig zu werten und zu blockieren.
-
 \end{subsection}
 
 \begin{subsection}{Geschossbewegung}
@@ -143,7 +134,6 @@ Bereits eine einzige detektierte Überschneidung genügt, um die geplante Bewegu
 Die Bewegung von Geschossen (\textit{Bullets}) stellt eine besondere Herausforderung dar, da sie sich mit hoher Geschwindigkeit bewegen und physikalisch korrekt von Wänden abprallen sollen.
 Anstatt die Flugbahn in jedem Tick neu zu berechnen, wurde ein Ansatz gewählt, bei dem der gesamte Pfad eines Geschosses -- inklusive aller Reflexionen -- zum Zeitpunkt seiner Erzeugung vorausberechnet wird.
 Dieses Vorgehen hat zwei Vorteile: Es reduziert die Rechenlast pro Tick und sorgt für ein deterministisches Verhalten, was für die Netzwerksynchronisation essenziell ist.
-
 Die Pfadberechnung in der \texttt{calculate\_path()}-Methode in \texttt{bullet.rs} ist ein iterativer Prozess:
 
 \paragraph{Finden des nächsten Kollisionspunktes}
@@ -151,21 +141,19 @@ Der Kern der Pfadberechnung ist die Methode \texttt{find\_next\_collision()}.
 Ein Test gegen jede Wand der Karte wäre ineffizient.
 Stattdessen wird der Suchraum intelligent eingeschränkt:
 \begin{enumerate}
-    \item \textbf{Tile-Traversal via DDA:} Mit der Methode \texttt{get\_tiles\_on\_ray()} wird ein Digital Differential Analyzer (DDA) Algorithmus angewendet.
-    \item Dieser ermittelt, ähnlich dem Bresenham-Algorithmus, eine exakte Liste aller Kacheln, die vom Strahl des Geschosses auf seinem aktuellen Kurs durchquert werden.
+    \item \textbf{Tile-Traversal via DDA:} Mit der Methode \texttt{get\_tiles\_on\_ray()} wird ein Digital Differential Analyzer (DDA) Algorithmus angewendet. Dieser ermittelt, ähnlich dem Bresenham-Algorithmus, eine exakte Liste aller Kacheln, die vom Strahl des Geschosses auf seinem aktuellen Kurs durchquert werden. Diese Technik ist in der Computergrafik als Voxel-Traversal bekannt \cite{amanatides1987fast}.
     \item \textbf{Selektive Kollisionsprüfung:} Anstatt alle Wände der Karte zu prüfen, werden nur die Wände der Kacheln aus der zuvor erstellten Liste auf eine mögliche Kollision getestet.
-    \item Hierzu wird eine Funktion für die Schnittpunktberechnung zwischen einem Strahl und einem Liniensegment (\texttt{ray\_line\_intersection}) verwendet.
+    Hierzu wird eine Funktion für die Schnittpunktberechnung zwischen einem Strahl und einem Liniensegment (\texttt{ray\_line\_intersection}) verwendet.
     \item \textbf{Ermittlung des nächsten Treffers:} Der Algorithmus speichert alle gefundenen Kollisionspunkte und wählt denjenigen mit der geringsten Distanz zum Startpunkt des aktuellen Pfadsegments aus.
-    \item Dies stellt sicher, dass das Geschoss korrekt an der ersten Wand, die es trifft, reflektiert wird und nicht an einer weiter entfernten.
+    Dies stellt sicher, dass das Geschoss korrekt an der ersten Wand, die es trifft, reflektiert wird und nicht an einer weiter entfernten.
 \end{enumerate}
 
 \paragraph{Iterative Pfaderstellung und -ausführung}
 Der Prozess des Kollisionsfindens wird wiederholt, wobei nach jeder Kollision ein neuer Richtungsvektor basierend auf dem Einfallswinkel und der Wandnormalen berechnet wird.
 Jeder Kollisionspunkt wird als Wegpunkt in einer Warteschlange (\texttt{VecDeque}) gespeichert.
 Dies geschieht solange, bis die maximale Reichweite des Geschosses (\texttt{BULLET\_TRAVEL\_DIST}) erreicht ist.
-
 Die \texttt{update()}-Methode pro Tick ist dadurch sehr performant: Sie bewegt das Geschoss lediglich entlang des geraden Liniensegments zum nächsten Wegpunkt in der Warteschlange.
 Erreicht das Geschoss einen Wegpunkt, wird dieser aus der Warteschlange entfernt, und die verbleibende Bewegungsdistanz des Ticks wird auf das nächste Segment angewendet, was für einen nahtlosen Übergang bei Reflexionen sorgt.
-
 \end{subsection}
 
+\end{section}

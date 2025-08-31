@@ -17,7 +17,7 @@ Im Folgenden werden die Erweiterungen im Detail beschrieben.
 \begin{subsection}{Framebuffer}
 Ein \textbf{Framebuffer} ist ein Bereich im Speicher, der direkt die Bildschirmausgabe repräsentiert.
 Jedes Byte (bzw. jedes Pixel) im Framebuffer entspricht einem Bildpunkt auf dem Monitor.
-Das System zeichnet, indem es Werte in diesen Speicher schreibt.
+Das System zeichnet, indem es Werte in diesen Speicher schreibt \cite{foley1995computer, osdev_framebuffer}.
 
 In MOROS wird der Pointer auf den Videospeicher bereits bereitgestellt.
 Unser Framebuffer-Modul kapselt diesen Speicher jedoch in einer \texttt{struct}, die folgende Daten speichert:
@@ -29,12 +29,11 @@ Unser Framebuffer-Modul kapselt diesen Speicher jedoch in einer \texttt{struct},
 \end{itemize}
 
 Der Puffer wird über \texttt{flush()} atomar in den tatsächlichen Framebuffer von MOROS kopiert.
-So wird immer ein vollständiges Bild ausgegeben, ohne dass während der Berechnung Artefakte entstehen.
-
+So wird immer ein vollständiges Bild ausgegeben, ohne dass während der Berechnung Artefakte entstehen. Dieses Vorgehen ist als Double Buffering bekannt und eine Standardtechnik zur Vermeidung von Flimmern (Flickering) in der Computergrafik \cite{nystrom2014game, osdev_double_buffering}.
 Der Framebuffer unterstützt verschiedene Funktionen:
 \begin{itemize}
     \item \textbf{Pixel setzen:} direktes Setzen einer Farbe an einer Position.
-    \item \textbf{Linien zeichnen:} implementiert mit dem Bresenham-Algorithmus.
+    \item \textbf{Linien zeichnen:} implementiert mit dem Bresenham-Algorithmus \cite{bresenham1965algorithm}.
     \item \textbf{Rechtecke zeichnen:} sowohl Umrandung als auch Füllung möglich.
     \item \textbf{Kreise zeichnen:} mit oder ohne Füllung.
     \item \textbf{Textausgabe:} mit einem Bitmap-Font, inklusive Skalierung.
@@ -42,16 +41,14 @@ Der Framebuffer unterstützt verschiedene Funktionen:
 \end{itemize}
 
 Damit liefert der Framebuffer die grafische Grundlage für die Darstellung von Spielfeld, Spielern, Bullets und Spielstatistiken.
-
 \end{subsection}
 
 \begin{subsection}{PS/2-Maus}
 Für das Zielen und Schießen im Spiel war eine zweite Eingabemöglichkeit notwendig.
 Dazu wurde eine vollständige PS/2-Maus-Unterstützung in MOROS ergänzt.
-
 \paragraph{Initialisierung.}
 MOROS bietet eine Schnittstelle, um Interrupt-Handler zu registrieren.
-Für die Maus wird der IRQ12 (PS/2-Port) über folgende Schritte initialisiert:
+Für die Maus wird der IRQ12 (PS/2-Port) über folgende Schritte initialisiert \cite{osdev_ps2_mouse, intel8259a_pic}:
 \begin{itemize}
     \item Aktivieren des zweiten PS/2-Ports mit Befehl \texttt{0xA8}.
     \item Konfiguration des Controllers und Aktivieren von IRQ12.
@@ -62,36 +59,32 @@ Für die Maus wird der IRQ12 (PS/2-Port) über folgende Schritte initialisiert:
 Bei jedem Interrupt werden drei Bytes von den Ports \texttt{0x64}/\texttt{0x60} gelesen.
 Diese enthalten Buttons, X-Bewegung und Y-Bewegung.
 Die Daten werden in ein \texttt{MouseEvent} umgewandelt, das die Buttons und Bewegungsdeltas enthält.
-
 \paragraph{Ereignis-Queue.}
 Da Mausbewegungen asynchron eintreffen, speichern wir sie in einer lockfreien Queue (MPMC).
 Der Spiel-Loop kann so jederzeit das letzte Event abfragen oder blockierend auf ein neues Event warten.
-Dies entkoppelt die schnelle IRQ-Verarbeitung von der Spiel-Logik.
+Dies entkoppelt die schnelle IRQ-Verarbeitung von der Spiel-Logik. Die Verwendung einer lockfreien Multiple-Producer-Multiple-Consumer-Warteschlange ist eine moderne Technik zur effizienten Synchronisation in nebenläufigen Systemen \cite{nikolaev2019scalable}.
 
 \end{subsection}
 
 \begin{subsection}{UDP-Erweiterungen}
-Für die Netzwerkverteilung des Spiels war UDP entscheidend, da es schnelle und kompakte Nachrichten erlaubt.
+Für die Netzwerkverteilung des Spiels war UDP entscheidend, da es schnelle und kompakte Nachrichten erlaubt, wie im definierenden Standard beschrieben \cite{rfc768}.
 MOROS brachte jedoch keine vollständige Implementierung mit.
 
 \paragraph{\texttt{listen}-Methode.}
 Eine Funktion \texttt{listen(port)} wurde ergänzt, um einen Socket auf einen Port zu binden.
 Ohne diese Methode hätte der Server keine eingehenden Nachrichten annehmen können.
 Die Funktion pollt so lange, bis der Socket gebunden ist oder ein Timeout erreicht wird.
-
 \paragraph{Fehler in der \texttt{write}-Methode.}
 Die ursprüngliche \texttt{write}-Funktion sendete zwar ein Paket, verließ die Poll-Schleife aber zu früh.
 Dadurch konnten Nachrichten mitunter mehrere Sekunden hängen bleiben.
 Die korrigierte Version pollt nach dem Senden erneut und stellt sicher, dass das Paket den Stack vollständig verlassen hat.
-
 Diese Änderungen machten eine stabile Echtzeitkommunikation im Spiel erst möglich.
 
 \end{subsection}
 
 \begin{subsection}{Debugging-Ausgaben}
 Während der Entwicklung waren Debugging-Funktionen unverzichtbar.
-Dafür wurde die Serial-Unterstützung aus \emph{hhuTOSr} übernommen und die Makros \texttt{kprint!} und \texttt{kprintln!} in MOROS integriert.
-
+Dafür wurde die Serial-Unterstützung aus \emph{hhuTOSr} übernommen und die Makros \texttt{kprint!} und \texttt{kprintln!} in MOROS integriert \cite{hhutosr_github}.
 Damit lassen sich einfache Debug-Ausgaben direkt auf die Konsole schreiben, ähnlich wie \texttt{println!} in Rust.
 Diese Ausgaben halfen insbesondere bei:
 \begin{itemize}
@@ -103,5 +96,4 @@ Diese Ausgaben halfen insbesondere bei:
 Ohne diese Ausgaben wäre die Fehlersuche im Betriebssystemkern erheblich schwieriger gewesen.
 
 \end{subsection}
-
 \end{section}
