@@ -3,6 +3,7 @@ Guten Abend Herr Schöttner,
 hier einmal unsere Abgabe für das Modul MA-Seminar-Systemsoftware-SS25.
 Von Rafael Reip und Simon Krämer.
 Da wir das Ganze ja zusammen gemacht haben, hier noch einmal die Übersicht, wer welche Teile vom Code und von der Ausarbeitung gemacht hat: (Die Aufteilung ist quasi so, wie im Vortrag)
+(steht auch nochmal alles in Abgabe.md)
 
 ## Code:
 
