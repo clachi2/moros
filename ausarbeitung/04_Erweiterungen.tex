@@ -8,7 +8,7 @@ Auch für die Ausgabe über den Bildschirm standen lediglich sehr einfache Texto
 Um ein interaktives Spiel zu realisieren, mussten daher mehrere neue Komponenten entwickelt werden:
 \begin{itemize}
     \item Einführung eines Framebuffers, um primitive grafische Operationen wie das Zeichnen von Linien, Rechtecken oder Text in Farben zu ermöglichen.
-    \item Implementierung einer vollständigen PS/2-Maus-Schnittstelle über Interrupts.
+    \item Implementierung einer vollständigen PS/2-Maus-\\Schnittstelle über Interrupts.
     \item Erweiterung und Fehlerbehebung im Netzwerkstack, um stabile UDP-Kommunikation zu gewährleisten.
     \item Zusätzliche Debugging-Funktionalitäten, um Entwicklungs- und Fehlersuche im Kernel zu erleichtern.
 \end{itemize}
@@ -38,7 +38,7 @@ So wird immer ein vollständiges Bild ausgegeben, ohne dass während der Berechn
 Der Framebuffer unterstützt verschiedene Funktionen:
 \begin{itemize}
     \item \textbf{Pixel setzen:} direktes Setzen einer Farbe an einer Position.
-    \item \textbf{Linien zeichnen:} implementiert mit dem Bresenham-Algorithmus~\cite{bresenham1965algorithm}.
+    \item \textbf{Linien zeichnen:} implementiert mit dem \\Bresenham-Algorithmus~\cite{bresenham1965algorithm}.
     \item \textbf{Rechtecke zeichnen:} sowohl Umrandung als auch Füllung möglich.
     \item \textbf{Kreise zeichnen:} mit oder ohne Füllung.
     \item \textbf{Textausgabe:} mit einem Bitmap-Font, inklusive Skalierung.
@@ -50,7 +50,7 @@ Damit liefert der Framebuffer die grafische Grundlage für die Darstellung von S
 
 \begin{subsection}{PS/2-Maus}
 Für das Zielen und Schießen im Spiel war eine zweite Eingabemöglichkeit notwendig.
-Dazu wurde eine vollständige PS/2-Maus-Unterstützung in MOROS ergänzt.
+Dazu wurde eine vollständige PS/2 Mausunterstützung in MOROS ergänzt.
 \paragraph{Initialisierung.}
 MOROS bietet eine Schnittstelle, um Interrupt-Handler zu registrieren.
 Für die Maus wird der IRQ12 (PS/2-Port) über folgende Schritte initialisiert~\cite{osdev_ps2_mouse, intel8259a_pic}:
@@ -62,7 +62,7 @@ Für die Maus wird der IRQ12 (PS/2-Port) über folgende Schritte initialisiert~\
 
 \paragraph{Interrupt-Verarbeitung.}
 Bei jedem Interrupt werden drei Bytes von den Ports \texttt{0x64}/\texttt{0x60} gelesen.
-Diese enthalten Buttons, X-Bewegung und Y-Bewegung.
+Diese enthalten Buttons, X Bewegung und Y Bewegung.
 Die Daten werden in ein \texttt{MouseEvent} umgewandelt, das die Buttons und Bewegungsdeltas enthält.
 \paragraph{Ereignis-Queue.}
 Da Mausbewegungen asynchron eintreffen, speichern wir sie in einer lockfreien Queue (MPMC).

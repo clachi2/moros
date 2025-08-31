@@ -22,7 +22,7 @@ Es initialisiert und verwaltet den Spielzustand sowie den Renderer.
     \item \texttt{userinput.rs:} Definiert eine Struktur zur Abbildung der rohen Eingabedaten (Tastatur- und Mauszustände) eines Spielers.
 \end{itemize}
 
-Die Nutzung des Spiels von außen, beispielsweise aus der \texttt{main.rs}, folgt einem einfachen Muster.
+Die Nutzung des Spiels von außen, beispielsweise aus der main.rs, folgt einem einfachen Muster.
 Nach der Initialisierung einer \texttt{Game}-Instanz wird eine Dauerschleife durchlaufen, in der zyklisch die Eingaben der Spieler aktualisiert, der Spielzustand über die \texttt{tick()}-Methode weiterberechnet und das Ergebnis anschließend mit der \texttt{draw()}-Methode gerendert wird.
 \end{subsection}
 
@@ -51,7 +51,7 @@ Dieser deterministische Ablauf stellt sicher, dass der Spielzustand bei gleichen
 
 \begin{subsection}{Rendering}
 
-Die visuelle Darstellung des Spiels wird vollständig von der \texttt{Renderer}-Komponente übernommen.
+Die visuelle Darstellung des Spiels wird vollständig von der Renderer Komponente übernommen.
 Diese greift auf die zuvor implementierte Framebuffer-Schnittstelle zu, um grafische Primitiven wie Linien, gefüllte Rechtecke und Text zu zeichnen.
 Der Rendering-Prozess, der in der \texttt{draw()}-Methode aufgerufen wird, ist klar strukturiert, um eine flimmerfreie und performante Ausgabe zu gewährleisten.
 Der Ablauf pro Frame ist wie folgt:
@@ -99,7 +99,7 @@ Dieser Prozess setzt sich fort, bis alle erreichbaren Kacheln markiert und dem B
 Das Ergebnis ist eine Liste von disjunkten Kachelmengen, die die voneinander getrennten "Inseln" der Karte repräsentieren.
 \paragraph{Verbindung der Bereiche}
 Solange mehr als ein Bereich existiert, wird eine Schleife durchlaufen, die diese Bereiche schrittweise miteinander verbindet.
-In jeder Iteration wird die Methode \texttt{remove\_one\_wall\_per\_area()} aufgerufen.
+In jeder Iteration wird die Methode remove\_one\_wall\_per\_area() aufgerufen.
 Diese durchläuft jeden identifizierten Bereich und innerhalb dessen jede Kachel.
 Für jede Kachel werden ihre Nachbarn überprüft.
 Findet der Algorithmus eine benachbarte Kachel, die nicht Teil des aktuellen Bereichs ist und durch eine Wand getrennt ist, wird exakt diese Wand entfernt.
@@ -141,9 +141,9 @@ Der Kern der Pfadberechnung ist die Methode \texttt{find\_next\_collision()}.
 Ein Test gegen jede Wand der Karte wäre ineffizient.
 Stattdessen wird der Suchraum intelligent eingeschränkt:
 \begin{enumerate}
-    \item \textbf{Tile-Traversal via DDA:} Mit der Methode \texttt{get\_tiles\_on\_ray()} wird ein Digital Differential Analyzer (DDA) Algorithmus angewendet. Dieser ermittelt, ähnlich dem Bresenham-Algorithmus, eine exakte Liste aller Kacheln, die vom Strahl des Geschosses auf seinem aktuellen Kurs durchquert werden. Diese Technik ist in der Computergrafik als Voxel-Traversal bekannt~\cite{amanatides1987fast}.
+    \item \textbf{Tile-Traversal via DDA:} Mit der Methode get\_tiles\_on\_ray() wird ein Digital Differential Analyzer (DDA) Algorithmus angewendet. Dieser ermittelt, ähnlich dem Bresenham Algorithmus, eine exakte Liste aller Kacheln, die vom Strahl des Geschosses auf seinem aktuellen Kurs durchquert werden. Diese Technik ist in der Computergrafik als Voxel-Traversal bekannt~\cite{amanatides1987fast}.
     \item \textbf{Selektive Kollisionsprüfung:} Anstatt alle Wände der Karte zu prüfen, werden nur die Wände der Kacheln aus der zuvor erstellten Liste auf eine mögliche Kollision getestet.
-    Hierzu wird eine Funktion für die Schnittpunktberechnung zwischen einem Strahl und einem Liniensegment (\texttt{ray\_line\_intersection}) verwendet.
+    Hierzu wird eine Funktion für die Schnittpunktberechnung zwischen einem Strahl und einem Liniensegment verwendet.
     \item \textbf{Ermittlung des nächsten Treffers:} Der Algorithmus speichert alle gefundenen Kollisionspunkte und wählt denjenigen mit der geringsten Distanz zum Startpunkt des aktuellen Pfadsegments aus.
     Dies stellt sicher, dass das Geschoss korrekt an der ersten Wand, die es trifft, reflektiert wird und nicht an einer weiter entfernten.
 \end{enumerate}
